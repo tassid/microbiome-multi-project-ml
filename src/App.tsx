@@ -27,7 +27,7 @@ import {
  * Visual: artigo acadêmico (estilo LaTeX). Voz: estudante explicando, casual.
  */
 
-type SectionId = "s1" | "s2" | "s3" | "s4" | "s5" | "refs";
+type SectionId = "s1" | "s2" | "s3" | "s4" | "s4b" | "s5" | "refs";
 
 const TERMS: Record<string, string> = {
   microbioma:
@@ -111,7 +111,8 @@ const TOC: TocEntry[] = [
   { id: "s2", number: "2", label: "O dataset", icon: <FlaskConical size={14} /> },
   { id: "s3", number: "3", label: "Conceitos que precisam ficar claros", icon: <BookOpen size={14} /> },
   { id: "s4", number: "4", label: "Comandos do pipeline", icon: <ListChecks size={14} /> },
-  { id: "s5", number: "5", label: "Por que isso importa pra tese", icon: <GraduationCap size={14} /> },
+  { id: "s4b", number: "5", label: "Resultados obtidos até agora", icon: <BarChart3 size={14} /> },
+  { id: "s5", number: "6", label: "Por que isso importa pra tese", icon: <GraduationCap size={14} /> },
   { id: "refs", number: "", label: "Referências", icon: <BookOpen size={14} /> },
 ];
 
@@ -282,10 +283,14 @@ qiime tools import \\
       </>
     ),
     commands: [
-      `qiime feature-classifier classify-sklearn \\
-  --i-classifier silva-138-99-nb-classifier.qza \\
+      `curl -L -o silva-v3v4-classifier.qza "https://www.arb-silva.de/archive/current/QIIME2/2026.7/SSU/V3V4-341f-806r/uniform/SILVA_144_SSURef_NR99_uniform_classifier_V3V4-341f-806r.qza"
+
+qiime feature-classifier classify-sklearn \\
+  --i-classifier silva-v3v4-classifier.qza \\
   --i-reads dada2_output/representative_sequences.qza \\
-  --o-classification taxonomy.qza`,
+  --p-n-jobs 4 \\
+  --output-dir taxonomy_output \\
+  --verbose`,
     ],
   },
   {
@@ -299,8 +304,16 @@ qiime tools import \\
         amostras diferem entre si (
         <Term id="diversidadeBeta">diversidade beta</Term>) — uma forma de
         enxergar, de forma visual, se o grupo Controle e o grupo Seca
-        realmente formam comunidades bacterianas diferentes. Segundo, roda
-        cinco testes estatísticos diferentes (a{" "}
+        realmente formam comunidades bacterianas diferentes. O filtro de
+        prevalência aqui mantém ASVs presentes em pelo menos 5% das
+        amostras (não 95% — esse é o filtro mais permissivo que o próprio
+        artigo usa, para remover só as ASVs raríssimas). Os resultados já
+        confirmam o padrão do artigo: a diversidade Shannon não difere
+        significativamente entre Controle e Seca (p = 0,145), mas a
+        composição da comunidade (Bray-Curtis, PERMANOVA) difere
+        fortemente (p = 0,001) — ou seja, as mesmas bactérias em
+        proporções diferentes, não uma comunidade mais ou menos diversa.
+        Segundo, roda cinco testes estatísticos diferentes (a{" "}
         <Term id="daa">análise de abundância diferencial</Term>) pra
         descobrir quais bactérias específicas aparecem em quantidade
         significativamente diferente entre os dois grupos — usar cinco
@@ -311,8 +324,51 @@ qiime tools import \\
     commands: [
       `qiime feature-table filter-features \\
   --i-table dada2_output/table.qza \\
-  --p-min-samples 592 \\
+  --p-min-samples 32 \\
   --o-filtered-table table-filtered.qza`,
+      `qiime diversity core-metrics \\
+  --i-table table-filtered.qza \\
+  --p-sampling-depth 17291 \\
+  --m-metadata-file sample-metadata.tsv \\
+  --output-dir core-metrics-results \\
+  --verbose`,
+      `qiime diversity alpha-group-significance \\
+  --i-alpha-diversity core-metrics-results/shannon_vector.qza \\
+  --m-metadata-file sample-metadata.tsv \\
+  --o-visualization core-metrics-results/shannon-group-significance.qzv`,
+      `qiime diversity beta-group-significance \\
+  --i-distance-matrix core-metrics-results/bray_curtis_distance_matrix.qza \\
+  --m-metadata-file sample-metadata.tsv \\
+  --m-metadata-column Watering_Regm \\
+  --p-pairwise \\
+  --o-visualization core-metrics-results/bray-curtis-watering-significance.qzv`,
+      `# Exportar tabela rarefeita e taxonomia para uso em R
+qiime tools export \\
+  --input-path core-metrics-results/rarefied_table.qza \\
+  --output-path exported-rarefied-table
+
+qiime tools export \\
+  --input-path taxonomy_output/classification.qza \\
+  --output-path exported-taxonomy`,
+      `# No R: os 5 métodos de DAA do artigo original (Hagen et al., 2024)
+edger_microbiomeMarker <- run_edger(ps_rare_filtered, group = "Watering_Regm",
+  method = "QLFT", taxa_rank = "none", transform = "identity", norm = "none",
+  p_adjust = "BH", pvalue_cutoff = 0.05)
+
+deseq_microbiomeMarker <- run_deseq2(ps_rare_filtered, group = "Watering_Regm",
+  taxa_rank = "none", norm = "none", transform = "identity", fitType = "local",
+  sfType = "poscounts", p_adjust = "BH", pvalue_cutoff = 0.05)
+
+aldex_microbiomeMarker <- run_aldex(ps_rare_filtered, group = "Watering_Regm",
+  taxa_rank = "none", transform = "identity", norm = "none",
+  method = "wilcox.test", p_adjust = "BH", pvalue_cutoff = 0.05,
+  mc_samples = 128, denom = "iqlr")
+
+ancom_da <- ancombc2(data = ps_rare_filtered, tax_level = NULL,
+  fix_formula = "Watering_Regm", p_adj_method = "BH", lib_cut = 0,
+  group = "Watering_Regm", struc_zero = FALSE, neg_lb = FALSE, alpha = 0.05)
+
+# Wilcoxon direto sobre dados transformados por CLR (ver seção 5.5)`,
     ],
   },
   {
@@ -984,9 +1040,141 @@ export default function App() {
             ))}
           </section>
 
-          {/* 5 */}
+          {/* 5 - RESULTADOS */}
+          <section id="s4b" ref={(el) => { refs.current["s4b"] = el; }}>
+            <h2 className="sec"><span className="sec-num">5.</span>Resultados obtidos até agora</h2>
+            <p>
+              Um resumo consolidado de todos os números produzidos pela
+              replicação até o momento, organizado por etapa. As etapas 8 e
+              9 (Machine Learning e comparação final) ainda estão pendentes.
+            </p>
+
+            <h3 className="sub-title">5.1 Processamento DADA2 e taxonomia</h3>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 3.</span> Números da tabela de ASVs antes de qualquer filtro.</caption>
+              <thead><tr><th>Métrica</th><th>Valor</th></tr></thead>
+              <tbody>
+                <tr><td>Amostras com dados após DADA2</td><td>623</td></tr>
+                <tr><td>ASVs únicas (sem filtro)</td><td>36.543</td></tr>
+                <tr><td>Total de observações (leituras)</td><td>32.100.122</td></tr>
+                <tr><td>ASVs classificadas com sucesso</td><td>36.446 de 36.543 (97 sem classificação)</td></tr>
+                <tr><td>Confiança média da classificação (SILVA)</td><td>0,97</td></tr>
+                <tr><td>ASVs com confiança ≥ 0,90</td><td>88,2%</td></tr>
+              </tbody>
+            </table>
+
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 4.</span> Filos bacterianos mais abundantes identificados.</caption>
+              <thead><tr><th>Filo</th><th>ASVs</th></tr></thead>
+              <tbody>
+                <tr><td>Pseudomonadota (ex-Proteobacteria)</td><td>9.390</td></tr>
+                <tr><td>Bacteroidota</td><td>5.920</td></tr>
+                <tr><td>Actinomycetota</td><td>3.281</td></tr>
+                <tr><td>Myxococcota</td><td>3.191</td></tr>
+                <tr><td>Verrucomicrobiota</td><td>2.209</td></tr>
+                <tr><td>Acidobacteriota</td><td>1.869</td></tr>
+              </tbody>
+            </table>
+            <div className="table-caption-below">
+              Composição condizente com o esperado para microbioma de solo/raiz de gramíneas.
+            </div>
+
+            <h3 className="sub-title">5.2 Filtro de prevalência e diversidade</h3>
+            <p>
+              A tabela de ASVs foi filtrada para manter apenas as sequências
+              presentes em pelo menos 5% das 623 amostras — um corte
+              deliberadamente permissivo, que remove apenas ruído raríssimo
+              (sequências vistas em uma ou duas amostras isoladas, prováveis
+              erros residuais de sequenciamento) sem descartar táxons
+              biologicamente relevantes. Isso reduziu a tabela de 36.543
+              para 4.354 ASVs, mantendo 618 das 623 amostras.
+            </p>
+            <p>
+              Sobre essa tabela filtrada, a diversidade foi calculada numa
+              profundidade de rarefação de 17.291 leituras por amostra — o
+              mesmo valor usado por Hagen et al. (2024), escolhido
+              deliberadamente para permitir comparação direta.
+            </p>
+
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 5.</span> Comparação entre os resultados de diversidade desta replicação e os valores publicados por Hagen et al. (2024).</caption>
+              <thead><tr><th>Métrica</th><th>Hagen et al. (2024)</th><th>Esta replicação</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>ASVs após filtro de prevalência</td>
+                  <td>3.276 (de 25.415)</td>
+                  <td>4.354 (de 36.543)</td>
+                </tr>
+                <tr>
+                  <td>Diversidade alfa (Shannon), Controle vs. Seca</td>
+                  <td>Sem diferença significativa</td>
+                  <td>p = 0,145 (sem diferença significativa)</td>
+                </tr>
+                <tr>
+                  <td>Diversidade beta (Bray-Curtis, PERMANOVA)</td>
+                  <td>Significativa; regime de rega explica 6,8% da variância</td>
+                  <td>p = 0,001; regime de rega explica ≈ 4,1% da variância (pseudo-F = 24,83, n = 577)</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="table-caption-below">
+              O percentual de variância desta replicação foi estimado a
+              partir do pseudo-F pela relação padrão para PERMANOVA de um
+              fator: R² = (a−1)F / [(a−1)F + (n−a)].
+            </div>
+
+            <div className="callout">
+              <div className="callout-label">leitura comparativa</div>
+              <p>
+                O padrão qualitativo bate exatamente com o artigo original
+                nos dois testes: nenhuma diferença de diversidade Shannon, e
+                uma diferença altamente significativa na composição via
+                Bray-Curtis. A magnitude do efeito (variância explicada)
+                ficou na mesma ordem de grandeza — 4,1% aqui contra 6,8% no
+                artigo — uma diferença pequena e esperada, já que o total de
+                ASVs, o número de amostras retidas (618 vs. o valor
+                reportado no artigo) e detalhes finos de parâmetros de
+                sequenciamento e do ambiente de execução nunca são
+                idênticos entre replicações independentes. O ponto central
+                — Controle e Seca não têm comunidades mais ou menos
+                diversas, mas têm comunidades <em>diferentes</em> em
+                composição — se confirma nos dois casos.
+              </p>
+            </div>
+
+            <h3 className="sub-title">5.3 Alvo de comparação para as próximas etapas</h3>
+            <p>
+              Para referência futura, os valores que a etapa de Machine
+              Learning (seção 4, etapa 8) precisará se aproximar, publicados
+              por Hagen et al. (2024) para o nível taxonômico de gênero — o
+              que apresentou o melhor desempenho no artigo original:
+            </p>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 6.</span> Desempenho do Random Forest no artigo original (nível de gênero, dataset Grass-Drought).</caption>
+              <thead><tr><th>Métrica</th><th>Valor publicado</th></tr></thead>
+              <tbody>
+                <tr><td>Acurácia</td><td>0,923 ± 0,029</td></tr>
+                <tr><td>F1-score</td><td>0,921 ± 0,030</td></tr>
+                <tr><td>Recall</td><td>0,954 ± 0,029</td></tr>
+                <tr><td>AUC</td><td>0,980 ± 0,010</td></tr>
+                <tr><td>Táxon marcador mais consistente</td><td>Gênero <em>Kribbella</em></td></tr>
+                <tr><td>Concordância DAA × SHAP (todos os ranks)</td><td>79,6% a 82,6%</td></tr>
+              </tbody>
+            </table>
+
+            <p>
+              A Análise de Abundância Diferencial com os 5 métodos (DESeq2,
+              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) está em andamento — os
+              dados já foram exportados do QIIME 2 para o R e os pacotes
+              necessários estão sendo instalados. As etapas de Machine
+              Learning (Random Forest + SHAP) e a comparação final com os
+              valores publicados ainda não foram iniciadas.
+            </p>
+          </section>
+
+          {/* 6 */}
           <section id="s5" ref={(el) => { refs.current["s5"] = el; }}>
-            <h2 className="sec"><span className="sec-num">5.</span>Por que isso importa pra tese</h2>
+            <h2 className="sec"><span className="sec-num">6.</span>Por que isso importa pra tese</h2>
             <p>
               A dissertação usa a mesma lógica desse artigo, mas para
               classificar <strong>sanidade em soja</strong> a partir do{" "}
@@ -998,7 +1186,7 @@ export default function App() {
               está só "decorando" as particularidades de cada projeto.
             </p>
             <table className="formal">
-              <caption><span className="cap-label">Tabela 2.</span> O que muda entre este estudo e a dissertação.</caption>
+              <caption><span className="cap-label">Tabela 7.</span> O que muda entre este estudo e a dissertação.</caption>
               <thead><tr><th>Neste estudo</th><th>Na dissertação</th></tr></thead>
               <tbody>
                 <tr><td>Um único estudo grande</td><td>Vários projetos de soja combinados</td></tr>
