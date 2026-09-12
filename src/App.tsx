@@ -77,6 +77,8 @@ const TERMS: Record<string, string> = {
     "Uma forma de deixar todas as amostras \"justas\" entre si: já que cada amostra foi sequenciada com uma profundidade diferente, a rarefação sorteia aleatoriamente o mesmo número de leituras de cada amostra, pra não comparar uma amostra rica em dados com outra pobre.",
   quartil:
     "Uma forma de dividir os dados em quatro partes iguais. O 1º quartil é o valor abaixo do qual estão 25% dos dados; o 3º quartil, abaixo do qual estão 75%. A distância entre eles mostra o quão espalhados os valores estão no meio da distribuição.",
+  tsne: "Uma técnica que pega dados com milhares de \"dimensões\" (uma por bactéria, por exemplo) e os achata num mapa de duas dimensões fácil de olhar — amostras parecidas ficam pertinho, amostras diferentes ficam longe. Serve pra enxergar visualmente se existem grupos escondidos nos dados.",
+  vies: "Quando um modelo aprende a reconhecer algo que não era pra ele aprender — por exemplo, de qual projeto ou espécie de planta veio a amostra, em vez do que realmente importa (seca ou sanidade) — porque esses fatores, sem querer, também formam grupos bem separados nos dados.",
 };
 
 function Term({ id, children }: { id: string; children: React.ReactNode }) {
@@ -134,8 +136,9 @@ const STEP_ICONS: Record<number, React.ReactNode> = {
   5: <Dna size={17} />,
   6: <Tag size={17} />,
   7: <BarChart3 size={17} />,
-  8: <Brain size={17} />,
-  9: <Check size={17} />,
+  8: <Eye size={17} />,
+  9: <Brain size={17} />,
+  10: <Check size={17} />,
 };
 
 interface Step {
@@ -383,6 +386,45 @@ ancom_da <- ancombc2(data = ps_rare_filtered, tax_level = NULL,
   },
   {
     n: 8,
+    title: "Verificar viés de agrupamento com t-SNE",
+    note: (
+      <>
+        Antes de treinar qualquer modelo, é importante checar se as
+        amostras não estão se agrupando por um motivo "errado". A{" "}
+        <Term id="tsne">t-SNE</Term> é uma técnica de redução de
+        dimensionalidade que pega os milhares de valores de abundância de
+        cada amostra e projeta tudo num mapa de duas dimensões, fácil de
+        visualizar — amostras parecidas ficam próximas, amostras diferentes
+        ficam distantes. O objetivo aqui não é bonito, é diagnóstico: se as
+        amostras se agruparem principalmente por espécie de planta,
+        compartimento (solo/raiz/rizosfera) ou projeto de origem — em vez
+        de por regime de rega — isso é sinal de{" "}
+        <Term id="vies">viés de agrupamento</Term>, e um Random Forest
+        treinado nesses dados corre o risco de aprender a reconhecer
+        espécie de planta ou projeto, não seca de verdade. Essa checagem é
+        especialmente relevante porque a dissertação pretende combinar
+        dados de vários projetos diferentes de soja: se o t-SNE mostrar
+        agrupamento por projeto em vez de por sanidade, a validação
+        leave-one-project-out não é opcional — é obrigatória.
+      </>
+    ),
+    commands: [
+      `from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+
+# X = tabela de abundância relativa (amostras x táxons), já filtrada
+tsne = TSNE(n_components=2, perplexity=30, random_state=42)
+embedding = tsne.fit_transform(X)
+
+# plotar colorindo por Watering_Regm, depois por Isolation_Source
+# e por Plant_Body_Site, separadamente — comparar os três mapas
+fig, ax = plt.subplots()
+scatter = ax.scatter(embedding[:, 0], embedding[:, 1], c=labels_watering_regm)
+plt.savefig("tsne_watering_regm.png")`,
+    ],
+  },
+  {
+    n: 9,
     title: "Machine Learning: RFC + SHAP",
     note: (
       <>
@@ -409,7 +451,8 @@ outer_cv = StratifiedKFold(n_splits=5, shuffle=True)`,
     ],
   },
   {
-    n: 9,
+    n: 10,
+
     title: "Comparar com o artigo publicado",
     note: (
       <>
@@ -1160,8 +1203,9 @@ export default function App() {
             <h2 className="sec"><span className="sec-num">5.</span>Resultados obtidos até agora</h2>
             <p>
               Um resumo consolidado de todos os números produzidos pela
-              replicação até o momento, organizado por etapa. As etapas 8 e
-              9 (Machine Learning e comparação final) ainda estão pendentes.
+              replicação até o momento, organizado por etapa. As etapas 8
+              (t-SNE), 9 (Machine Learning) e 10 (comparação final) ainda
+              estão pendentes.
             </p>
 
             <h3 className="sub-title">5.1 Processamento DADA2 e taxonomia</h3>
@@ -1288,7 +1332,7 @@ export default function App() {
             <h3 className="sub-title">5.3 Alvo de comparação para as próximas etapas</h3>
             <p>
               Para referência futura, os valores que a etapa de Machine
-              Learning (seção 4, etapa 8) precisará se aproximar, publicados
+              Learning (seção 4, etapa 9) precisará se aproximar, publicados
               por Hagen et al. (2024) para o nível taxonômico de gênero — o
               que apresentou o melhor desempenho no artigo original:
             </p>
@@ -1309,9 +1353,10 @@ export default function App() {
               A Análise de Abundância Diferencial com os 5 métodos (DESeq2,
               ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) está em andamento — os
               dados já foram exportados do QIIME 2 para o R e os pacotes
-              necessários estão sendo instalados. As etapas de Machine
-              Learning (Random Forest + SHAP) e a comparação final com os
-              valores publicados ainda não foram iniciadas.
+              necessários estão sendo instalados. A checagem de viés via
+              t-SNE, o Machine Learning (Random Forest + SHAP) e a
+              comparação final com os valores publicados ainda não foram
+              iniciados.
             </p>
           </section>
 
