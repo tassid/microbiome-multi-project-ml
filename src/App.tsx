@@ -141,11 +141,13 @@ const STEP_ICONS: Record<number, React.ReactNode> = {
   10: <Check size={17} />,
 };
 
+type CommandEntry = string | { code: string; caption: React.ReactNode };
+
 interface Step {
   n: number;
   title: string;
   note: React.ReactNode;
-  commands: string[];
+  commands: CommandEntry[];
 }
 
 const STEPS: Step[] = [
@@ -268,16 +270,22 @@ qiime tools import \\
       </>
     ),
     commands: [
-      `qiime demux summarize \\
+      {
+        code: `qiime demux summarize \\
   --i-data cutadapt_output/trimmed_sequences.qza \\
   --o-visualization cutadapt_output/trimmed_sequences_summary.qzv`,
-      `qiime dada2 denoise-paired \\
+        caption: "Gera o gráfico interativo de qualidade por posição — é olhando esse resultado que se decide onde truncar cada leitura.",
+      },
+      {
+        code: `qiime dada2 denoise-paired \\
   --i-demultiplexed-seqs cutadapt_output/trimmed_sequences.qza \\
   --p-trunc-len-f 260 \\
   --p-trunc-len-r 190 \\
   --p-n-threads 4 \\
   --output-dir dada2_output \\
   --verbose`,
+        caption: "Roda o DADA2 propriamente dito: aprende o erro, infere ASVs, junta os pares e remove quimeras. Gera a tabela final de ASVs por amostra.",
+      },
     ],
   },
   {
@@ -296,14 +304,19 @@ qiime tools import \\
       </>
     ),
     commands: [
-      `curl -L -o silva-v3v4-classifier.qza "https://www.arb-silva.de/archive/current/QIIME2/2026.7/SSU/V3V4-341f-806r/uniform/SILVA_144_SSURef_NR99_uniform_classifier_V3V4-341f-806r.qza"
-
-qiime feature-classifier classify-sklearn \\
+      {
+        code: `curl -L -o silva-v3v4-classifier.qza "https://www.arb-silva.de/archive/current/QIIME2/2026.7/SSU/V3V4-341f-806r/uniform/SILVA_144_SSURef_NR99_uniform_classifier_V3V4-341f-806r.qza"`,
+        caption: "Baixa o classificador do SILVA já treinado especificamente para a região V3–V4 (mesmos primers 341F/785R usados aqui) — encontrado no site oficial do SILVA depois que os links antigos do QIIME 2 deixaram de funcionar.",
+      },
+      {
+        code: `qiime feature-classifier classify-sklearn \\
   --i-classifier silva-v3v4-classifier.qza \\
   --i-reads dada2_output/representative_sequences.qza \\
   --p-n-jobs 4 \\
   --output-dir taxonomy_output \\
   --verbose`,
+        caption: "Aplica o classificador às ASVs do DADA2, gerando a tabela final com a taxonomia e a confiança de cada atribuição.",
+      },
     ],
   },
   {
@@ -338,27 +351,40 @@ qiime feature-classifier classify-sklearn \\
       </>
     ),
     commands: [
-      `qiime feature-table filter-features \\
+      {
+        code: `qiime feature-table filter-features \\
   --i-table dada2_output/table.qza \\
   --p-min-samples 32 \\
   --o-filtered-table table-filtered.qza`,
-      `qiime diversity core-metrics \\
+        caption: "Remove as ASVs raríssimas (presentes em menos de 5% das 623 amostras), sem descartar nada biologicamente relevante.",
+      },
+      {
+        code: `qiime diversity core-metrics \\
   --i-table table-filtered.qza \\
   --p-sampling-depth 17291 \\
   --m-metadata-file sample-metadata.tsv \\
   --output-dir core-metrics-results \\
   --verbose`,
-      `qiime diversity alpha-group-significance \\
+        caption: "Rarefaz todas as amostras em 17.291 leituras e calcula de uma vez a diversidade alfa (Shannon, Observed Features, Evenness) e beta (Bray-Curtis, Jaccard) com PCoA de cada.",
+      },
+      {
+        code: `qiime diversity alpha-group-significance \\
   --i-alpha-diversity core-metrics-results/shannon_vector.qza \\
   --m-metadata-file sample-metadata.tsv \\
   --o-visualization core-metrics-results/shannon-group-significance.qzv`,
-      `qiime diversity beta-group-significance \\
+        caption: "Testa (Kruskal-Wallis) se a diversidade Shannon difere entre Controle e Seca. Resultado: p = 0,145, sem diferença significativa.",
+      },
+      {
+        code: `qiime diversity beta-group-significance \\
   --i-distance-matrix core-metrics-results/bray_curtis_distance_matrix.qza \\
   --m-metadata-file sample-metadata.tsv \\
   --m-metadata-column Watering_Regm \\
   --p-pairwise \\
   --o-visualization core-metrics-results/bray-curtis-watering-significance.qzv`,
-      `# Exportar tabela rarefeita e taxonomia para uso em R
+        caption: "Testa (PERMANOVA) se a composição da comunidade difere entre os grupos. Resultado: p = 0,001, altamente significativo.",
+      },
+      {
+        code: `# Exportar tabela rarefeita e taxonomia para uso em R
 qiime tools export \\
   --input-path core-metrics-results/rarefied_table.qza \\
   --output-path exported-rarefied-table
@@ -366,7 +392,10 @@ qiime tools export \\
 qiime tools export \\
   --input-path taxonomy_output/classification.qza \\
   --output-path exported-taxonomy`,
-      `# =============================================================
+        caption: "Converte os artefatos .qza em arquivos comuns (.biom e .tsv) que o R consegue ler diretamente, preparando a ponte QIIME 2 → R.",
+      },
+      {
+        code: `# =============================================================
 # Análise de Abundância Diferencial (DAA) - 5 métodos
 # Replicando Hagen et al. (2024), nível de ASV, Watering_Regm
 # =============================================================
@@ -378,11 +407,14 @@ library(microbiome)
 library(microbiomeMarker)
 library(ANCOMBC)
 library(UpSetR)
-library(gtools)
-
-# -------------------------------------------------------------
+library(gtools)`,
+        caption: "Carrega todos os pacotes de R necessários para o restante do script.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 1. Importar os dados exportados do QIIME 2
 # -------------------------------------------------------------
+
 # Ajuste os caminhos abaixo se você rodou os comandos de export
 # em uma pasta diferente da atual.
 
@@ -403,11 +435,14 @@ tax_mat <- as.matrix(tax_split[, c("Domain","Phylum","Class","Order","Family","G
 
 metadata <- read.delim("sample-metadata.tsv", stringsAsFactors = FALSE)
 metadata <- metadata[metadata$sample.id != "#q2:types", ]
-rownames(metadata) <- metadata$sample.id
-
-# -------------------------------------------------------------
+rownames(metadata) <- metadata$sample.id`,
+        caption: "Carrega as sequências (biom), taxonomia e metadados exportados do QIIME 2, juntando taxonomia e metadados numa única tabela.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 2. Montar o objeto phyloseq
 # -------------------------------------------------------------
+
 ps_rare_filtered <- phyloseq(
   otu_table(otu_mat, taxa_are_rows = TRUE),
   tax_table(tax_mat),
@@ -417,11 +452,14 @@ ps_rare_filtered <- phyloseq(
 print(ps_rare_filtered)
 
 taxa_info <- data.frame(tax_table(ps_rare_filtered)) %>%
-  rownames_to_column(var = "ASV")
-
-# -------------------------------------------------------------
+  rownames_to_column(var = "ASV")`,
+        caption: "Monta o objeto phyloseq — a estrutura de dados padrão em R para análises de microbioma, unindo contagens, taxonomia e metadados das amostras num só lugar.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 3. Wilcoxon rank-sum (sobre dados transformados por CLR)
 # -------------------------------------------------------------
+
 ps_rare_filtered_clr <- microbiome::transform(ps_rare_filtered, "clr")
 
 ps_wilcox_r <- data.frame(phyloseq::otu_table(ps_rare_filtered_clr))
@@ -444,11 +482,14 @@ sig_wilcox_r <- wilcox_results_r %>%
   dplyr::select(ASV, p_value, BH_FDR, everything()) %>%
   arrange(order(gtools::mixedorder(ASV)))
 
-cat("Wilcoxon: ", nrow(sig_wilcox_r), "ASVs significativas\\n")
-
-# -------------------------------------------------------------
+cat("Wilcoxon: ", nrow(sig_wilcox_r), "ASVs significativas\\n")`,
+        caption: "Primeiro método: transforma os dados por CLR (log-razão centrada) e roda um teste de Wilcoxon ASV por ASV, comparando Controle e Seca.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 4. edgeR
 # -------------------------------------------------------------
+
 edger_microbiomeMarker <- run_edger(
   ps_rare_filtered, group = "Watering_Regm", method = "QLFT",
   taxa_rank = "none", transform = "identity", norm = "none",
@@ -460,11 +501,14 @@ edger_marker <- marker_table(edger_microbiomeMarker) %>%
   dplyr::rename(ASV = feature) %>%
   left_join(taxa_info, by = "ASV")
 
-cat("edgeR: ", nrow(edger_marker), "ASVs significativas\\n")
-
-# -------------------------------------------------------------
+cat("edgeR: ", nrow(edger_marker), "ASVs significativas\\n")`,
+        caption: "Segundo método: edgeR, originalmente criado para RNA-seq, adaptado aqui para detectar ASVs com abundância diferente entre os grupos.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 5. DESeq2
 # -------------------------------------------------------------
+
 deseq_microbiomeMarker <- run_deseq2(
   ps_rare_filtered, group = "Watering_Regm", confounders = character(0),
   contrast = NULL, taxa_rank = "none", norm = "none", transform = "identity",
@@ -477,11 +521,14 @@ deseq_marker <- marker_table(deseq_microbiomeMarker) %>%
   dplyr::rename(ASV = feature) %>%
   left_join(taxa_info, by = "ASV")
 
-cat("DESeq2: ", nrow(deseq_marker), "ASVs significativas\\n")
-
-# -------------------------------------------------------------
+cat("DESeq2: ", nrow(deseq_marker), "ASVs significativas\\n")`,
+        caption: "Terceiro método: DESeq2, um dos mais usados em expressão gênica, aqui aplicado à tabela de ASVs sem normalização extra (norm = \"none\"), já que os dados já vêm rarefeitos.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 6. ALDEx2
 # -------------------------------------------------------------
+
 aldex_microbiomeMarker <- run_aldex(
   ps_rare_filtered, group = "Watering_Regm", taxa_rank = "none",
   transform = "identity", norm = "none", method = "wilcox.test",
@@ -494,11 +541,14 @@ aldex_marker <- marker_table(aldex_microbiomeMarker) %>%
   dplyr::rename(ASV = feature) %>%
   left_join(taxa_info, by = "ASV")
 
-cat("ALDEx2: ", nrow(aldex_marker), "ASVs significativas\\n")
-
-# -------------------------------------------------------------
+cat("ALDEx2: ", nrow(aldex_marker), "ASVs significativas\\n")`,
+        caption: "Quarto método: ALDEx2, que gera 128 amostras Monte Carlo por ASV para estimar a incerteza da composição antes de testar — por isso é o mais lento dos cinco.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 7. ANCOM-BC2
 # -------------------------------------------------------------
+
 ancom_da <- ancombc2(
   data = ps_rare_filtered, tax_level = NULL, fix_formula = "Watering_Regm",
   p_adj_method = "BH", lib_cut = 0, group = "Watering_Regm",
@@ -520,11 +570,14 @@ ancombc2_marker <- ancom_res %>%
   mutate(enrich_group = ifelse(lfc >= 0, "Drought", "Control")) %>%
   dplyr::rename(ef_ancombc2 = lfc, pvalue = p_val, padj = q_val)
 
-cat("ANCOM-BC2: ", nrow(ancombc2_marker), "ASVs significativas\\n")
-
-# -------------------------------------------------------------
+cat("ANCOM-BC2: ", nrow(ancombc2_marker), "ASVs significativas\\n")`,
+        caption: "Quinto método: ANCOM-BC2, que modela diretamente o viés de composição dos dados de microbioma (em vez de só normalizar), com correção de FDR.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 8. Comparar os 5 métodos com UpSetR
 # -------------------------------------------------------------
+
 upset_list <- list(
   Wilcoxon = sig_wilcox_r$ASV,
   edgeR    = edger_marker$ASV,
@@ -539,14 +592,20 @@ dev.off()
 
 cat("\\nResumo final:\\n")
 print(sapply(upset_list, length))
-cat("\\nGráfico salvo em: upset_daa_comparison.pdf\\n")
-
-# -------------------------------------------------------------
+cat("\\nGráfico salvo em: upset_daa_comparison.pdf\\n")`,
+        caption: "Reúne as ASVs significativas dos 5 métodos numa lista e gera um gráfico UpSetR — mostra visualmente quantas ASVs cada método achou sozinho e quantas se repetem entre métodos.",
+      },
+      {
+        code: `# -------------------------------------------------------------
 # 9. Salvar tudo pra não precisar rodar de novo
 # -------------------------------------------------------------
+
 save(sig_wilcox_r, edger_marker, deseq_marker, aldex_marker, ancombc2_marker,
      file = "daa_results_asv_level.RData")
 cat("\\nResultados salvos em: daa_results_asv_level.RData\\n")`,
+        caption: "Salva todos os resultados num único arquivo .RData, para não precisar rodar tudo de novo caso a sessão do R feche.",
+      },
+
     ],
   },
   {
@@ -1059,6 +1118,15 @@ export default function App() {
           justify-content: space-between;
           gap: 10px;
         }
+        .cmd-caption {
+          font-size: 12.5px;
+          color: var(--ink-soft);
+          text-align: left;
+          margin: 0 0 16px;
+          padding-left: 2px;
+          border-left: 2px solid var(--rule-light);
+          padding-left: 10px;
+        }
         pre.listing { margin: 0; overflow-x: auto; flex: 1; }
         .listing code {
           font-family: var(--font-mono);
@@ -1356,9 +1424,16 @@ export default function App() {
                   </div>
                 </div>
                 <p className="task-note">{step.note}</p>
-                {step.commands.map((cmd, i) => (
-                  <Listing command={cmd} key={i} />
-                ))}
+                {step.commands.map((cmd, i) => {
+                  const code = typeof cmd === "string" ? cmd : cmd.code;
+                  const caption = typeof cmd === "string" ? null : cmd.caption;
+                  return (
+                    <div key={i}>
+                      <Listing command={code} />
+                      {caption && <p className="cmd-caption">{caption}</p>}
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </section>
