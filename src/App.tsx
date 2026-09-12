@@ -67,6 +67,16 @@ const TERMS: Record<string, string> = {
     "Um \"projeto guarda-chuva\" dentro de um banco de dados público (o NCBI/SRA), onde os cientistas depositam os dados brutos de sequenciamento de uma pesquisa.",
   qiimeView:
     "Um site (view.qiime2.org) que abre os arquivos gerados pelo QIIME 2 (.qza e .qzv) direto no navegador, sem precisar instalar nada nem enviar os dados pra nenhum servidor — é só arrastar o arquivo pra tela.",
+  permanova:
+    "Um teste estatístico que verifica se dois (ou mais) grupos de amostras têm comunidades bacterianas realmente diferentes, sem exigir que os dados sigam uma distribuição específica — funciona bem mesmo com dados de microbioma, que costumam ser bem \"tortos\".",
+  pseudoF:
+    "O número que o teste PERMANOVA calcula pra medir o quanto os grupos se separam — quanto maior, mais forte é a diferença entre eles. Sozinho não diz muita coisa; o que importa é o p-valor que vem junto.",
+  variancia:
+    "O quanto de toda a diferença entre as amostras pode ser \"atribuída\" a um fator específico (aqui, se a amostra é Controle ou Seca). Mesmo uma porcentagem pequena pode ser estatisticamente importante, porque o resto da variação vem de todas as outras diferenças naturais entre amostras (espécie de planta, local, etc.).",
+  rarefacao:
+    "Uma forma de deixar todas as amostras \"justas\" entre si: já que cada amostra foi sequenciada com uma profundidade diferente, a rarefação sorteia aleatoriamente o mesmo número de leituras de cada amostra, pra não comparar uma amostra rica em dados com outra pobre.",
+  quartil:
+    "Uma forma de dividir os dados em quatro partes iguais. O 1º quartil é o valor abaixo do qual estão 25% dos dados; o 3º quartil, abaixo do qual estão 75%. A distância entre eles mostra o quão espalhados os valores estão no meio da distribuição.",
 };
 
 function Term({ id, children }: { id: string; children: React.ReactNode }) {
@@ -459,6 +469,96 @@ function Listing({ command }: { command: string }) {
   );
 }
 
+/** Boxplot de duas caixas, com dados reais extraídos do alpha-compare.svg (Shannon, Controle vs. Seca). */
+function ShannonBoxplot() {
+  const W = 420;
+  const H = 260;
+  const padL = 40;
+  const padB = 30;
+  const padT = 14;
+  const plotH = H - padT - padB;
+  const yMin = 5;
+  const yMax = 10;
+  const scaleY = (v: number) => padT + (yMax - v) * (plotH / (yMax - yMin));
+
+  const groups = [
+    { label: "Controle (n=302)", min: 6.07, q1: 7.80, median: 8.66, q3: 9.05, max: 9.63, cx: 130 },
+    { label: "Seca (n=275)", min: 5.97, q1: 7.57, median: 8.65, q3: 8.96, max: 9.56, cx: 300 },
+  ];
+  const boxW = 70;
+
+  return (
+    <figure className="chart-fig">
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Boxplot do índice de Shannon por regime de rega">
+        {/* eixo y */}
+        <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="var(--ink)" strokeWidth={1} />
+        {[5, 6, 7, 8, 9, 10].map((v) => (
+          <g key={v}>
+            <line x1={padL - 4} y1={scaleY(v)} x2={padL} y2={scaleY(v)} stroke="var(--ink)" />
+            <text x={padL - 8} y={scaleY(v) + 3} textAnchor="end" fontSize="10" fill="var(--ink-soft)">{v}</text>
+          </g>
+        ))}
+        {/* eixo x */}
+        <line x1={padL} y1={H - padB} x2={W - 20} y2={H - padB} stroke="var(--ink)" strokeWidth={1} />
+        {groups.map((g) => (
+          <g key={g.label}>
+            {/* whisker */}
+            <line x1={g.cx} y1={scaleY(g.min)} x2={g.cx} y2={scaleY(g.q1)} stroke="var(--ink)" strokeDasharray="2,2" />
+            <line x1={g.cx} y1={scaleY(g.q3)} x2={g.cx} y2={scaleY(g.max)} stroke="var(--ink)" strokeDasharray="2,2" />
+            {/* box */}
+            <rect x={g.cx - boxW / 2} y={scaleY(g.q3)} width={boxW} height={scaleY(g.q1) - scaleY(g.q3)} fill="#fff" stroke="var(--ink)" />
+            {/* median */}
+            <line x1={g.cx - boxW / 2} y1={scaleY(g.median)} x2={g.cx + boxW / 2} y2={scaleY(g.median)} stroke="var(--ink)" strokeWidth={1.5} />
+            <text x={g.cx} y={H - padB + 16} textAnchor="middle" fontSize="11" fill="var(--ink)">{g.label}</text>
+          </g>
+        ))}
+      </svg>
+      <figcaption>
+        Figura 1. Índice de Shannon por regime de rega — dados extraídos da visualização QIIME 2 (não significativo, p = 0,145).
+      </figcaption>
+    </figure>
+  );
+}
+
+/** Gráfico de barras horizontal genérico, estilo acadêmico (sem cor, só ink). */
+function BarChart({
+  data,
+  unit = "",
+}: {
+  data: { label: string; value: number }[];
+  unit?: string;
+}) {
+  const W = 460;
+  const rowH = 26;
+  const padL = 190;
+  const padR = 60;
+  const H = data.length * rowH + 20;
+  const max = Math.max(...data.map((d) => d.value));
+  const scaleX = (v: number) => (v / max) * (W - padL - padR);
+
+  return (
+    <figure className="chart-fig">
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Gráfico de barras">
+        {data.map((d, i) => {
+          const y = i * rowH + 10;
+          const w = scaleX(d.value);
+          return (
+            <g key={d.label}>
+              <text x={padL - 8} y={y + rowH / 2 + 4} textAnchor="end" fontSize="11" fill="var(--ink)">
+                {d.label}
+              </text>
+              <rect x={padL} y={y + 3} width={w} height={rowH - 10} fill="#fff" stroke="var(--ink)" />
+              <text x={padL + w + 6} y={y + rowH / 2 + 4} fontSize="10.5" fill="var(--ink-soft)">
+                {d.value.toLocaleString("pt-BR")}{unit}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </figure>
+  );
+}
+
 export default function App() {
   const [, setActive] = useState<SectionId>("s1");
   const refs = useRef<Partial<Record<SectionId, HTMLElement | null>>>({});
@@ -652,6 +752,22 @@ export default function App() {
         table.formal th { font-weight: 700; }
         .table-caption-below { font-size: 12.5px; color: var(--ink-soft); margin: 6px 0 20px; }
 
+        .chart-fig {
+          margin: 12px 0 22px;
+          padding: 14px 16px;
+          border: 1px solid var(--rule-light);
+          border-radius: 8px;
+          background: #fff;
+        }
+        .chart-fig svg { display: block; }
+        .chart-fig figcaption {
+          font-size: 12px;
+          font-style: italic;
+          color: var(--ink-soft);
+          margin-top: 8px;
+          text-align: center;
+        }
+
         .bar-viz {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -760,8 +876,7 @@ export default function App() {
         .copy-btn:hover { background: #3a3826; }
         .copy-btn.copied { background: #3f5e3f; border-color: #3f5e3f; color: #fff; }
 
-        ol.refs { list-style: none; padding: 0; margin: 0; max-width: 50em; }
-        ol.refs li {
+        ol.refs { list-style: none; padding: 0; margin: 0; max-width: 50em; }        ol.refs li {
           font-size: 14px;
           margin-bottom: 14px;
           padding-left: 2.4em;
@@ -1050,6 +1165,15 @@ export default function App() {
             </p>
 
             <h3 className="sub-title">5.1 Processamento DADA2 e taxonomia</h3>
+            <p>
+              Antes de qualquer filtro, o <Term id="dada2">DADA2</Term>
+              gerou 36.543 <Term id="asv">ASVs</Term> a partir das 623
+              amostras. Cada uma foi comparada ao banco{" "}
+              <Term id="silva">SILVA</Term>, resultando numa{" "}
+              <Term id="taxonomia">taxonomia</Term> atribuída pra 36.446
+              delas (97 ficaram sem classificação — uma taxa de sucesso de
+              99,7%), com confiança média de 0,97 numa escala de 0 a 1.
+            </p>
             <table className="formal">
               <caption><span className="cap-label">Tabela 3.</span> Números da tabela de ASVs antes de qualquer filtro.</caption>
               <thead><tr><th>Métrica</th><th>Valor</th></tr></thead>
@@ -1063,6 +1187,22 @@ export default function App() {
               </tbody>
             </table>
 
+            <p>
+              Entre as bactérias identificadas, seis filos concentram a
+              maior parte das ASVs — um filo é um nível bem alto da{" "}
+              <Term id="taxonomia">taxonomia</Term>, agrupando famílias
+              inteiras de bactérias com características em comum:
+            </p>
+            <BarChart
+              data={[
+                { label: "Pseudomonadota", value: 9390 },
+                { label: "Bacteroidota", value: 5920 },
+                { label: "Actinomycetota", value: 3281 },
+                { label: "Myxococcota", value: 3191 },
+                { label: "Verrucomicrobiota", value: 2209 },
+                { label: "Acidobacteriota", value: 1869 },
+              ]}
+            />
             <table className="formal">
               <caption><span className="cap-label">Tabela 4.</span> Filos bacterianos mais abundantes identificados.</caption>
               <thead><tr><th>Filo</th><th>ASVs</th></tr></thead>
@@ -1090,11 +1230,14 @@ export default function App() {
               para 4.354 ASVs, mantendo 618 das 623 amostras.
             </p>
             <p>
-              Sobre essa tabela filtrada, a diversidade foi calculada numa
-              profundidade de rarefação de 17.291 leituras por amostra — o
-              mesmo valor usado por Hagen et al. (2024), escolhido
-              deliberadamente para permitir comparação direta.
+              Sobre essa tabela filtrada, a diversidade foi calculada numa{" "}
+              <Term id="rarefacao">profundidade de rarefação</Term> de
+              17.291 leituras por amostra — o mesmo valor usado por Hagen et
+              al. (2024), escolhido deliberadamente para permitir
+              comparação direta.
             </p>
+
+            <ShannonBoxplot />
 
             <table className="formal">
               <caption><span className="cap-label">Tabela 5.</span> Comparação entre os resultados de diversidade desta replicação e os valores publicados por Hagen et al. (2024).</caption>
@@ -1111,9 +1254,9 @@ export default function App() {
                   <td>p = 0,145 (sem diferença significativa)</td>
                 </tr>
                 <tr>
-                  <td>Diversidade beta (Bray-Curtis, PERMANOVA)</td>
-                  <td>Significativa; regime de rega explica 6,8% da variância</td>
-                  <td>p = 0,001; regime de rega explica ≈ 4,1% da variância (pseudo-F = 24,83, n = 577)</td>
+                  <td>Diversidade beta (Bray-Curtis, <Term id="permanova">PERMANOVA</Term>)</td>
+                  <td>Significativa; regime de rega explica 6,8% da <Term id="variancia">variância</Term></td>
+                  <td>p = 0,001; regime de rega explica ≈ 4,1% da variância (<Term id="pseudoF">pseudo-F</Term> = 24,83, n = 577)</td>
                 </tr>
               </tbody>
             </table>
