@@ -331,7 +331,10 @@ qiime feature-classifier classify-sklearn \\
         descobrir quais bactérias específicas aparecem em quantidade
         significativamente diferente entre os dois grupos — usar cinco
         métodos ao mesmo tempo, em vez de um só, ajuda a confiar mais no
-        resultado quando todos concordam.
+        resultado quando todos concordam. Os 12 pacotes de R necessários
+        (phyloseq, DESeq2, ALDEx2, edgeR, ANCOMBC, microbiomeMarker, entre
+        outros) já foram instalados, e o script completo com os 5 métodos
+        está pronto — falta só executá-lo.
       </>
     ),
     commands: [
@@ -363,25 +366,187 @@ qiime tools export \\
 qiime tools export \\
   --input-path taxonomy_output/classification.qza \\
   --output-path exported-taxonomy`,
-      `# No R: os 5 métodos de DAA do artigo original (Hagen et al., 2024)
-edger_microbiomeMarker <- run_edger(ps_rare_filtered, group = "Watering_Regm",
-  method = "QLFT", taxa_rank = "none", transform = "identity", norm = "none",
-  p_adjust = "BH", pvalue_cutoff = 0.05)
+      `# =============================================================
+# Análise de Abundância Diferencial (DAA) - 5 métodos
+# Replicando Hagen et al. (2024), nível de ASV, Watering_Regm
+# =============================================================
 
-deseq_microbiomeMarker <- run_deseq2(ps_rare_filtered, group = "Watering_Regm",
-  taxa_rank = "none", norm = "none", transform = "identity", fitType = "local",
-  sfType = "poscounts", p_adjust = "BH", pvalue_cutoff = 0.05)
+library(phyloseq)
+library(biomformat)
+library(tidyverse)
+library(microbiome)
+library(microbiomeMarker)
+library(ANCOMBC)
+library(UpSetR)
+library(gtools)
 
-aldex_microbiomeMarker <- run_aldex(ps_rare_filtered, group = "Watering_Regm",
+# -------------------------------------------------------------
+# 1. Importar os dados exportados do QIIME 2
+# -------------------------------------------------------------
+# Ajuste os caminhos abaixo se você rodou os comandos de export
+# em uma pasta diferente da atual.
+
+biom_data_obj <- read_biom("exported-rarefied-table/feature-table.biom")
+otu_mat       <- as(biom_data(biom_data_obj), "matrix")
+
+taxonomy_tsv <- read.delim("exported-taxonomy/taxonomy.tsv", stringsAsFactors = FALSE)
+# taxonomy_tsv tem colunas: Feature.ID, Taxon, Confidence
+
+# separar a string de taxonomia em colunas por rank
+tax_split <- taxonomy_tsv %>%
+  separate(Taxon, into = c("Domain","Kingdom","Phylum","Class","Order","Family","Genus"),
+           sep = ";", fill = "right", extra = "drop") %>%
+  mutate(across(Domain:Genus, ~ trimws(.))) %>%
+  column_to_rownames("Feature.ID")
+
+tax_mat <- as.matrix(tax_split[, c("Domain","Phylum","Class","Order","Family","Genus")])
+
+metadata <- read.delim("sample-metadata.tsv", stringsAsFactors = FALSE)
+metadata <- metadata[metadata$sample.id != "#q2:types", ]
+rownames(metadata) <- metadata$sample.id
+
+# -------------------------------------------------------------
+# 2. Montar o objeto phyloseq
+# -------------------------------------------------------------
+ps_rare_filtered <- phyloseq(
+  otu_table(otu_mat, taxa_are_rows = TRUE),
+  tax_table(tax_mat),
+  sample_data(metadata)
+)
+
+print(ps_rare_filtered)
+
+taxa_info <- data.frame(tax_table(ps_rare_filtered)) %>%
+  rownames_to_column(var = "ASV")
+
+# -------------------------------------------------------------
+# 3. Wilcoxon rank-sum (sobre dados transformados por CLR)
+# -------------------------------------------------------------
+ps_rare_filtered_clr <- microbiome::transform(ps_rare_filtered, "clr")
+
+ps_wilcox_r <- data.frame(phyloseq::otu_table(ps_rare_filtered_clr))
+ps_wilcox_r$Watering_Regm <- phyloseq::sample_data(ps_rare_filtered_clr)$Watering_Regm
+
+wilcox_pval <- function(df) wilcox.test(abund ~ Watering_Regm, data = df)$p.value
+
+wilcox_results_r <- ps_wilcox_r %>%
+  gather(key = ASV, value = abund, -Watering_Regm) %>%
+  group_by(ASV) %>%
+  nest() %>%
+  mutate(p_value = map_dbl(data, wilcox_pval)) %>%
+  dplyr::select(ASV, p_value)
+
+sig_wilcox_r <- wilcox_results_r %>%
+  full_join(taxa_info, by = "ASV") %>%
+  arrange(p_value) %>%
+  mutate(BH_FDR = p.adjust(p_value, "BH")) %>%
+  filter(BH_FDR < 0.05) %>%
+  dplyr::select(ASV, p_value, BH_FDR, everything()) %>%
+  arrange(order(gtools::mixedorder(ASV)))
+
+cat("Wilcoxon: ", nrow(sig_wilcox_r), "ASVs significativas\\n")
+
+# -------------------------------------------------------------
+# 4. edgeR
+# -------------------------------------------------------------
+edger_microbiomeMarker <- run_edger(
+  ps_rare_filtered, group = "Watering_Regm", method = "QLFT",
   taxa_rank = "none", transform = "identity", norm = "none",
-  method = "wilcox.test", p_adjust = "BH", pvalue_cutoff = 0.05,
-  mc_samples = 128, denom = "iqlr")
+  p_adjust = "BH", pvalue_cutoff = 0.05
+)
+edger_marker <- marker_table(edger_microbiomeMarker) %>%
+  as_tibble() %>%
+  arrange(order(gtools::mixedorder(feature))) %>%
+  dplyr::rename(ASV = feature) %>%
+  left_join(taxa_info, by = "ASV")
 
-ancom_da <- ancombc2(data = ps_rare_filtered, tax_level = NULL,
-  fix_formula = "Watering_Regm", p_adj_method = "BH", lib_cut = 0,
-  group = "Watering_Regm", struc_zero = FALSE, neg_lb = FALSE, alpha = 0.05)
+cat("edgeR: ", nrow(edger_marker), "ASVs significativas\\n")
 
-# Wilcoxon direto sobre dados transformados por CLR (ver seção 5.5)`,
+# -------------------------------------------------------------
+# 5. DESeq2
+# -------------------------------------------------------------
+deseq_microbiomeMarker <- run_deseq2(
+  ps_rare_filtered, group = "Watering_Regm", confounders = character(0),
+  contrast = NULL, taxa_rank = "none", norm = "none", transform = "identity",
+  fitType = "local", sfType = "poscounts", betaPrior = FALSE, useT = FALSE,
+  p_adjust = "BH", pvalue_cutoff = 0.05
+)
+deseq_marker <- marker_table(deseq_microbiomeMarker) %>%
+  as_tibble() %>%
+  arrange(order(gtools::mixedorder(feature))) %>%
+  dplyr::rename(ASV = feature) %>%
+  left_join(taxa_info, by = "ASV")
+
+cat("DESeq2: ", nrow(deseq_marker), "ASVs significativas\\n")
+
+# -------------------------------------------------------------
+# 6. ALDEx2
+# -------------------------------------------------------------
+aldex_microbiomeMarker <- run_aldex(
+  ps_rare_filtered, group = "Watering_Regm", taxa_rank = "none",
+  transform = "identity", norm = "none", method = "wilcox.test",
+  p_adjust = "BH", pvalue_cutoff = 0.05, mc_samples = 128,
+  denom = "iqlr", paired = FALSE
+)
+aldex_marker <- marker_table(aldex_microbiomeMarker) %>%
+  as_tibble() %>%
+  arrange(order(gtools::mixedorder(feature))) %>%
+  dplyr::rename(ASV = feature) %>%
+  left_join(taxa_info, by = "ASV")
+
+cat("ALDEx2: ", nrow(aldex_marker), "ASVs significativas\\n")
+
+# -------------------------------------------------------------
+# 7. ANCOM-BC2
+# -------------------------------------------------------------
+ancom_da <- ancombc2(
+  data = ps_rare_filtered, tax_level = NULL, fix_formula = "Watering_Regm",
+  p_adj_method = "BH", lib_cut = 0, group = "Watering_Regm",
+  struc_zero = FALSE, neg_lb = FALSE, alpha = 0.05, global = FALSE
+)
+
+ancom_res <- data.frame(
+  ASV   = unlist(ancom_da$res$taxon),
+  lfc   = unlist(ancom_da$res$lfc_Watering_RegmDrought),
+  W     = unlist(ancom_da$res$W_Watering_RegmDrought),
+  p_val = unlist(ancom_da$res$p_Watering_RegmDrought),
+  q_val = unlist(ancom_da$res$q_Watering_RegmDrought)
+)
+
+ancombc2_marker <- ancom_res %>%
+  filter(q_val < 0.05) %>%
+  arrange(order(gtools::mixedorder(ASV))) %>%
+  left_join(taxa_info, by = "ASV") %>%
+  mutate(enrich_group = ifelse(lfc >= 0, "Drought", "Control")) %>%
+  dplyr::rename(ef_ancombc2 = lfc, pvalue = p_val, padj = q_val)
+
+cat("ANCOM-BC2: ", nrow(ancombc2_marker), "ASVs significativas\\n")
+
+# -------------------------------------------------------------
+# 8. Comparar os 5 métodos com UpSetR
+# -------------------------------------------------------------
+upset_list <- list(
+  Wilcoxon = sig_wilcox_r$ASV,
+  edgeR    = edger_marker$ASV,
+  DESeq2   = deseq_marker$ASV,
+  ALDEx2   = aldex_marker$ASV,
+  ANCOMBC2 = ancombc2_marker$ASV
+)
+
+pdf("upset_daa_comparison.pdf", width = 8, height = 5)
+print(upset(fromList(upset_list), order.by = "freq"))
+dev.off()
+
+cat("\\nResumo final:\\n")
+print(sapply(upset_list, length))
+cat("\\nGráfico salvo em: upset_daa_comparison.pdf\\n")
+
+# -------------------------------------------------------------
+# 9. Salvar tudo pra não precisar rodar de novo
+# -------------------------------------------------------------
+save(sig_wilcox_r, edger_marker, deseq_marker, aldex_marker, ancombc2_marker,
+     file = "daa_results_asv_level.RData")
+cat("\\nResultados salvos em: daa_results_asv_level.RData\\n")`,
     ],
   },
   {
@@ -1351,9 +1516,12 @@ export default function App() {
 
             <p>
               A Análise de Abundância Diferencial com os 5 métodos (DESeq2,
-              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) está em andamento — os
-              dados já foram exportados do QIIME 2 para o R e os pacotes
-              necessários estão sendo instalados. A checagem de viés via
+              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) está pronta para rodar —
+              os dados já foram exportados do QIIME 2, os 12 pacotes de R
+              necessários foram instalados (incluindo compilar dependências
+              de sistema como o Cairo, via Homebrew), e o script completo
+              (<code>daa_5_metodos.R</code>) já reproduz literalmente o
+              código do repositório original. A checagem de viés via
               t-SNE, o Machine Learning (Random Forest + SHAP) e a
               comparação final com os valores publicados ainda não foram
               iniciados.
