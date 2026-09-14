@@ -2002,7 +2002,7 @@ export default function App() {
           <div className="abstract">
             <div className="abstract-heading">Resumo</div>
             <p>
-              Este é o registro de como a autora está replicando, do zero, o
+              Replicando, do zero, o
               pipeline do artigo de Hagen et al. (2024) — que usa machine
               learning pra descobrir se o solo está estressado pela seca só
               olhando pras bactérias que vivem nele. A orientadora pediu
