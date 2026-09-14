@@ -1672,7 +1672,7 @@ export default function App() {
             </p>
             <figure className="chart-fig">
               <img
-                src={`${import.meta.env.BASE_URL}tsne_bias_check.png`}
+                src={`${import.meta.env.BASE_URL}figures/tsne_bias_check.png`}
                 alt="Projeção t-SNE geral colorida por regime de rega, compartimento e espécie de planta"
                 style={{ width: "100%", height: "auto", display: "block" }}
               />
@@ -1688,7 +1688,7 @@ export default function App() {
             </p>
             <figure className="chart-fig">
               <img
-                src={`${import.meta.env.BASE_URL}tsne_by_compartment.png`}
+                src={`${import.meta.env.BASE_URL}figures/tsne_by_compartment.png`}
                 alt="Projeção t-SNE estratificada por compartimento, colorida por regime de rega"
                 style={{ width: "100%", height: "auto", display: "block" }}
               />
@@ -1696,6 +1696,17 @@ export default function App() {
                 Figura 3. t-SNE dentro de cada compartimento, colorida só
                 por regime de rega — a separação Controle/Seca varia em
                 nitidez, mas aparece nos três painéis.
+              </figcaption>
+            </figure>
+            <figure className="chart-fig">
+              <img
+                src={`${import.meta.env.BASE_URL}figures/tsne_bias_check_stratified.png`}
+                alt="Checagem de viés estratificada"
+                style={{ width: "100%", height: "auto", display: "block" }}
+              />
+              <figcaption>
+                Figura 4. Versão estratificada da checagem de viés,
+                complementando a Figura 3.
               </figcaption>
             </figure>
             <table className="formal">
