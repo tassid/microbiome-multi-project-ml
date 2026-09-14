@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 /**
- * Documento de acompanhamento — Réplica do estudo de microbioma do solo
+ * Documento de acompanhamento: Réplica do estudo de microbioma do solo
  * sob estresse hídrico (Hagen et al., 2024).
  * Visual: artigo acadêmico (estilo LaTeX). Voz: estudante explicando, casual.
  */
@@ -31,7 +31,7 @@ type SectionId = "s1" | "s2" | "s3" | "s4" | "s4b" | "s5" | "refs";
 
 const TERMS: Record<string, string> = {
   microbioma:
-    "O conjunto de todos os micro-organismos (principalmente bactérias) que vivem num lugar — aqui, no solo perto das raízes das plantas.",
+    "O conjunto de todos os micro-organismos (principalmente bactérias) que vivem num lugar, aqui no solo perto das raízes das plantas.",
   "16s":
     "Um pedacinho específico do DNA que toda bactéria tem. Sequenciar essa parte é como ler o \"nome de família\" de cada bactéria numa amostra.",
   sequenciamento:
@@ -46,11 +46,11 @@ const TERMS: Record<string, string> = {
   cutadapt:
     "O programa usado pra cortar fora esses pedacinhos de primer das sequências, antes de analisar o resto.",
   taxonomia:
-    "O \"nome científico\" de cada bactéria — de que família, gênero ou espécie ela é, mais ou menos como uma árvore genealógica.",
+    "O \"nome científico\" de cada bactéria: de que família, gênero ou espécie ela é, mais ou menos como uma árvore genealógica.",
   silva:
     "Um grande banco de dados online com sequências de bactérias já identificadas, usado como \"dicionário\" pra dar nome às sequências encontradas.",
   diversidadeAlfa:
-    "Quantas espécies diferentes de bactérias existem dentro de UMA amostra — tipo contar quantos tipos de doce tem numa caixa.",
+    "Quantas espécies diferentes de bactérias existem dentro de UMA amostra, como contar quantos tipos de doce tem numa caixa.",
   diversidadeBeta:
     "O quanto DUAS amostras são parecidas ou diferentes entre si, em termos de quais bactérias elas têm.",
   daa: "Um conjunto de testes estatísticos que compara dois grupos (por exemplo, solo regado vs. solo seco) pra achar quais bactérias aparecem em quantidade bem diferente entre eles.",
@@ -58,43 +58,43 @@ const TERMS: Record<string, string> = {
     "Um tipo de modelo de inteligência artificial que toma decisões combinando várias \"árvores de decisão\" simples, tipo uma votação entre várias opiniões.",
   nestedCV:
     "Uma forma cuidadosa de testar se o modelo realmente aprendeu algo útil, e não só \"decorou\" os dados de treino, dividindo os dados em pedaços de um jeito específico.",
-  shap: "Uma ferramenta que abre a \"caixa preta\" do modelo e explica quais bactérias pesaram mais na decisão dele — tipo um resumo do raciocínio da inteligência artificial.",
+  shap: "Uma ferramenta que abre a \"caixa preta\" do modelo e explica quais bactérias pesaram mais na decisão dele, como um resumo do raciocínio da inteligência artificial.",
   looPo:
-    "Um jeito de testar o modelo em que, em vez de misturar tudo aleatoriamente, cada teste deixa de fora um estudo/projeto inteiro — pra ver se o modelo funciona além do experimento específico onde foi treinado.",
+    "Um jeito de testar o modelo em que, em vez de misturar tudo aleatoriamente, cada teste deixa de fora um estudo/projeto inteiro, para ver se o modelo funciona além do experimento específico onde foi treinado.",
   rizosfera:
     "A fina camada de solo bem coladinha nas raízes da planta, onde a interação com as bactérias é mais intensa.",
   bioproject:
     "Um \"projeto guarda-chuva\" dentro de um banco de dados público (o NCBI/SRA), onde os cientistas depositam os dados brutos de sequenciamento de uma pesquisa.",
   qiimeView:
-    "Um site (view.qiime2.org) que abre os arquivos gerados pelo QIIME 2 (.qza e .qzv) direto no navegador, sem precisar instalar nada nem enviar os dados pra nenhum servidor — é só arrastar o arquivo pra tela.",
+    "Um site (view.qiime2.org) que abre os arquivos gerados pelo QIIME 2 (.qza e .qzv) direto no navegador, sem precisar instalar nada nem enviar os dados pra nenhum servidor: é só arrastar o arquivo pra tela.",
   permanova:
-    "Um teste estatístico que verifica se dois (ou mais) grupos de amostras têm comunidades bacterianas realmente diferentes, sem exigir que os dados sigam uma distribuição específica — funciona bem mesmo com dados de microbioma, que costumam ser bem \"tortos\".",
+    "Um teste estatístico que verifica se dois (ou mais) grupos de amostras têm comunidades bacterianas realmente diferentes, sem exigir que os dados sigam uma distribuição específica; funciona bem mesmo com dados de microbioma, que costumam ser bem \"tortos\".",
   pseudoF:
-    "O número que o teste PERMANOVA calcula pra medir o quanto os grupos se separam — quanto maior, mais forte é a diferença entre eles. Sozinho não diz muita coisa; o que importa é o p-valor que vem junto.",
+    "O número que o teste PERMANOVA calcula pra medir o quanto os grupos se separam: quanto maior, mais forte é a diferença entre eles. Sozinho não diz muita coisa; o que importa é o p-valor que vem junto.",
   variancia:
     "O quanto de toda a diferença entre as amostras pode ser \"atribuída\" a um fator específico (aqui, se a amostra é Controle ou Seca). Mesmo uma porcentagem pequena pode ser estatisticamente importante, porque o resto da variação vem de todas as outras diferenças naturais entre amostras (espécie de planta, local, etc.).",
   rarefacao:
     "Uma forma de deixar todas as amostras \"justas\" entre si: já que cada amostra foi sequenciada com uma profundidade diferente, a rarefação sorteia aleatoriamente o mesmo número de leituras de cada amostra, pra não comparar uma amostra rica em dados com outra pobre.",
   quartil:
     "Uma forma de dividir os dados em quatro partes iguais. O 1º quartil é o valor abaixo do qual estão 25% dos dados; o 3º quartil, abaixo do qual estão 75%. A distância entre eles mostra o quão espalhados os valores estão no meio da distribuição.",
-  tsne: "Uma técnica que pega dados com milhares de \"dimensões\" (uma por bactéria, por exemplo) e os achata num mapa de duas dimensões fácil de olhar — amostras parecidas ficam pertinho, amostras diferentes ficam longe. Serve pra enxergar visualmente se existem grupos escondidos nos dados. O parâmetro \"perplexidade\" controla o equilíbrio entre olhar vizinhos bem próximos ou um contexto mais amplo de cada amostra — valores entre 5 e 50 costumam funcionar bem, e vale testar mais de um.",
-  vies: "Quando um modelo aprende a reconhecer algo que não era pra ele aprender — por exemplo, de qual projeto ou espécie de planta veio a amostra, em vez do que realmente importa (seca ou sanidade) — porque esses fatores, sem querer, também formam grupos bem separados nos dados.",
+  tsne: "Uma técnica que pega dados com milhares de \"dimensões\" (uma por bactéria, por exemplo) e os achata num mapa de duas dimensões fácil de olhar, amostras parecidas ficam pertinho, amostras diferentes ficam longe. Serve pra enxergar visualmente se existem grupos escondidos nos dados. O parâmetro \"perplexidade\" controla o equilíbrio entre olhar vizinhos bem próximos ou um contexto mais amplo de cada amostra; valores entre 5 e 50 costumam funcionar bem, e vale testar mais de um.",
+  vies: "Quando um modelo aprende a reconhecer algo que não era pra ele aprender (por exemplo, de qual projeto ou espécie de planta veio a amostra, em vez do que realmente importa: seca ou sanidade), porque esses fatores, sem querer, também formam grupos bem separados nos dados.",
   phyloseq: "O formato de dados padrão em R para estudos de microbioma: junta numa única estrutura a tabela de contagens de cada ASV, a taxonomia de cada uma e os metadados das amostras (regime de rega, compartimento etc.), pra facilitar todas as análises seguintes.",
-  wilcoxonMethod: "Um teste estatístico que compara dois grupos sem assumir que os dados seguem uma distribuição específica (como a curva de sino) — útil porque dados de microbioma raramente seguem essa curva.",
+  wilcoxonMethod: "Um teste estatístico que compara dois grupos sem assumir que os dados seguem uma distribuição específica (como a curva de sino), útil porque dados de microbioma raramente seguem essa curva.",
   edgerMethod: "Um método originalmente criado para comparar níveis de expressão de genes (RNA-seq), adaptado aqui para comparar quantidades de bactérias entre grupos.",
   deseqMethod: "Parecido com o edgeR na origem (RNA-seq), mas usa uma forma diferente de estimar o quanto os dados variam naturalmente antes de decidir se uma diferença é real.",
-  ancombcMethod: "Diferente dos outros quatro métodos (que vêm da genômica de expressão gênica), esse foi criado especificamente pra dados de microbioma — ele modela diretamente uma distorção conhecida desses dados (o fato de serem \"composicionais\": se uma bactéria aumenta, as outras parecem diminuir só por causa da matemática, não porque diminuíram de verdade).",
-  clr: "Uma transformação matemática (log-razão centrada) que corrige a distorção de dados \"composicionais\" — em vez de olhar a quantidade bruta de cada bactéria, olha a proporção dela em relação à média geométrica da amostra, o que evita comparações enganosas entre amostras com profundidade de sequenciamento diferente.",
+  ancombcMethod: "Diferente dos outros quatro métodos (que vêm da genômica de expressão gênica), esse foi criado especificamente pra dados de microbioma: ele modela diretamente uma distorção conhecida desses dados (o fato de serem \"composicionais\": se uma bactéria aumenta, as outras parecem diminuir só por causa da matemática, não porque diminuíram de verdade).",
+  clr: "Uma transformação matemática (log-razão centrada) que corrige a distorção de dados \"composicionais\": em vez de olhar a quantidade bruta de cada bactéria, olha a proporção dela em relação à média geométrica da amostra, o que evita comparações enganosas entre amostras com profundidade de sequenciamento diferente.",
   correcaoBH: "Quando se testam milhares de ASVs ao mesmo tempo, uma parte vai dar \"significativa\" só por acaso, mesmo sem diferença real. A correção de Benjamini-Hochberg (BH) ajusta os p-valores pra manter esse risco de falso positivo sob controle, mesmo testando muitas hipóteses de uma vez.",
   alfaSignificancia: "O limite que se define antes do teste pra decidir se um resultado conta como \"estatisticamente significativo\". Um alfa de 0,05 significa aceitar até 5% de chance de dizer que existe diferença quando na verdade não existe.",
-  upsetPlot: "Um gráfico que mostra, entre vários conjuntos de itens (aqui, as ASVs significativas de cada método), quantos itens cada combinação de conjuntos tem em comum — a barra mais alta costuma ser o grupo em que todo mundo concorda.",
-  consensoDaa: "As ASVs que aparecem como significativas em vários métodos de DAA ao mesmo tempo (não só um) — quanto mais métodos concordam sobre uma mesma ASV, mais confiável ela é como candidata a táxon marcador real, e não um artefato estatístico de um método específico.",
-  classificadorUniforme: "Uma versão do classificador do SILVA treinada sem dar peso extra a nenhum tipo de ambiente — a alternativa (\"weighted\"/ponderado) ajusta o classificador pra funcionar melhor num habitat específico (intestino, solo etc.), mas exige saber de antemão qual habitat esperar, o que nem sempre é o caso.",
+  upsetPlot: "Um gráfico que mostra, entre vários conjuntos de itens (aqui, as ASVs significativas de cada método), quantos itens cada combinação de conjuntos tem em comum: a barra mais alta costuma ser o grupo em que todo mundo concorda.",
+  consensoDaa: "As ASVs que aparecem como significativas em vários métodos de DAA ao mesmo tempo (não só um): quanto mais métodos concordam sobre uma mesma ASV, mais confiável ela é como candidata a táxon marcador real, e não um artefato estatístico de um método específico.",
+  classificadorUniforme: "Uma versão do classificador do SILVA treinada sem dar peso extra a nenhum tipo de ambiente; a alternativa (\"weighted\"/ponderado) ajusta o classificador pra funcionar melhor num habitat específico (intestino, solo etc.), mas exige saber de antemão qual habitat esperar, o que nem sempre é o caso.",
   acuracia: "A proporção de vezes que o modelo acertou a previsão (Controle ou Seca) sobre o total de amostras testadas. Simples de entender, mas pode enganar se os grupos forem muito desbalanceados.",
   f1score: "Uma média que equilibra dois erros diferentes que o modelo pode cometer: dizer que uma amostra é \"Seca\" quando não é, ou deixar passar uma amostra que realmente é \"Seca\". Um F1 alto significa que o modelo é bom nos dois sentidos ao mesmo tempo, não só num deles.",
   recallMetric: "De todas as amostras que realmente eram \"Seca\", quantas o modelo conseguiu identificar corretamente. Um recall alto significa que o modelo raramente deixa passar um caso positivo.",
   aucMetric: "Resume o quão bem o modelo separa os dois grupos em todos os limiares de decisão possíveis, não só num ponto de corte fixo. Varia de 0,5 (chute aleatório) a 1,0 (separação perfeita).",
-  kribbella: "Um gênero de bactéria do solo (família Nocardioidaceae) que, no artigo original, apareceu como o marcador mais consistente de estresse hídrico entre os diferentes ranks taxonômicos testados — ou seja, a bactéria cuja quantidade mudou de forma mais confiável entre solo regado e solo sob seca.",
+  kribbella: "Um gênero de bactéria do solo (família Nocardioidaceae) que, no artigo original, apareceu como o marcador mais consistente de estresse hídrico entre os diferentes ranks taxonômicos testados, ou seja, a bactéria cuja quantidade mudou de forma mais confiável entre solo regado e solo sob seca.",
 };
 
 function Term({ id, children }: { id: string; children: React.ReactNode }) {
@@ -174,7 +174,7 @@ const STEPS: Step[] = [
     note: (
       <>
         O QIIME 2 é o programa principal usado em quase todas as etapas
-        seguintes — ele reúne, num só lugar, as ferramentas de{" "}
+        seguintes: ele reúne, num só lugar, as ferramentas de{" "}
         <Term id="dada2">DADA2</Term>, de download de dados, de corte de
         primer e de classificação taxonômica. Essa etapa só prepara o
         "ambiente" de trabalho, num Mac Apple Silicon rodando via Rosetta 2
@@ -198,7 +198,7 @@ conda config --env --set subdir osx-64`,
         Antes de baixar qualquer coisa, é preciso saber exatamente{" "}
         <em>quais</em> amostras pertencem a este estudo. O{" "}
         <Term id="bioproject">BioProject</Term> onde os dados foram
-        publicados reúne 880 experimentos, mas só 623 são deste estudo —
+        publicados reúne 880 experimentos, mas só 623 são deste estudo;
         os outros são de pesquisas diferentes do mesmo grupo de
         cientistas. Por isso, em vez de usar o BioProject inteiro, a lista
         de amostras foi tirada direto do arquivo <em>metadata.csv</em>{" "}
@@ -225,7 +225,7 @@ qiime tools import \\
         uma delas, direto do banco público onde foram armazenados (o
         SRA, mantido pelo governo americano). Cada amostra gera um par de
         arquivos (leitura "de ida" e "de volta" do sequenciador), então
-        são 623 pares de arquivos no total — o que explica por que esse
+        são 623 pares de arquivos no total, o que explica por que esse
         passo demora bastante (nesse caso, cerca de 11 horas).
       </>
     ),
@@ -246,7 +246,7 @@ qiime tools import \\
         <Term id="primers">primers</Term> pra "marcar" qual parte do genoma
         da bactéria vai ser copiada e lida. Só que esses primers ficam
         grudados nas pontas de cada leitura depois do sequenciamento, e
-        eles não são informação útil sobre a bactéria em si — só "ruído"
+        eles não são informação útil sobre a bactéria em si, apenas "ruído"
         do processo de laboratório. Por isso, antes de qualquer análise,
         eles precisam ser cortados fora. Aqui foram usados os primers
         341F e 785R, que marcam a região V3–V4 do{" "}
@@ -270,7 +270,7 @@ qiime tools import \\
     note: (
       <>
         Nem toda posição de uma leitura de sequenciamento tem a mesma
-        confiabilidade — normalmente, o começo da leitura é bem preciso, e
+        confiabilidade: normalmente, o começo da leitura é bem preciso, e
         o final vai piorando. O primeiro comando gera um gráfico (visto no{" "}
         <Term id="qiimeView">QIIME 2 View</Term>) que mostra essa qualidade
         posição por posição, o que permite decidir onde "cortar" cada
@@ -283,7 +283,7 @@ qiime tools import \\
         uma, e descarta{" "}
         <Term id="quimeras">quimeras</Term>. No final dessa etapa, existe
         uma tabela dizendo quantas vezes cada bactéria apareceu em cada
-        amostra — a base pra tudo que vem depois.
+        amostra, a base pra tudo que vem depois.
       </>
     ),
     commands: [
@@ -291,7 +291,7 @@ qiime tools import \\
         code: `qiime demux summarize \\
   --i-data cutadapt_output/trimmed_sequences.qza \\
   --o-visualization cutadapt_output/trimmed_sequences_summary.qzv`,
-        caption: "Gera o gráfico interativo de qualidade por posição — é olhando esse resultado que se decide onde truncar cada leitura.",
+        caption: "Gera o gráfico interativo de qualidade por posição: é olhando esse resultado que se decide onde truncar cada leitura.",
       },
       {
         code: `qiime dada2 denoise-paired \\
@@ -311,12 +311,12 @@ qiime tools import \\
     note: (
       <>
         A tabela de <Term id="asv">ASVs</Term> gerada pelo DADA2 tem
-        sequências de DNA, mas não diz o <em>nome</em> de cada bactéria —
+        sequências de DNA, mas não diz o <em>nome</em> de cada bactéria,
         só o código genético dela. Essa etapa resolve isso: compara cada
         ASV com o banco de dados <Term id="silva">SILVA</Term>, que já tem
         milhares de sequências identificadas, e usa um método estatístico
         (o classificador RDP) pra dizer qual é a{" "}
-        <Term id="taxonomia">taxonomia</Term> mais provável de cada uma —
+        <Term id="taxonomia">taxonomia</Term> mais provável de cada uma,
         de que família, gênero ou espécie de bactéria se trata.
       </>
     ),
@@ -327,7 +327,7 @@ qiime tools import \\
           <>
             Baixa o classificador <Term id="classificadorUniforme">uniforme</Term> do
             SILVA já treinado especificamente para a região V3–V4 (mesmos
-            primers 341F/785R usados aqui) — encontrado no site oficial do
+            primers 341F/785R usados aqui), encontrado no site oficial do
             SILVA depois que os links antigos do QIIME 2 deixaram de
             funcionar.
           </>
@@ -353,21 +353,21 @@ qiime tools import \\
         Primeiro, descreve o quão diversa é cada amostra (
         <Term id="diversidadeAlfa">diversidade alfa</Term>) e o quanto as
         amostras diferem entre si (
-        <Term id="diversidadeBeta">diversidade beta</Term>) — uma forma de
+        <Term id="diversidadeBeta">diversidade beta</Term>), uma forma de
         enxergar, de forma visual, se o grupo Controle e o grupo Seca
         realmente formam comunidades bacterianas diferentes. O filtro de
         prevalência aqui mantém ASVs presentes em pelo menos 5% das
-        amostras (não 95% — esse é o filtro mais permissivo que o próprio
+        amostras (não 95%; esse é o filtro mais permissivo que o próprio
         artigo usa, para remover só as ASVs raríssimas). Os resultados já
         confirmam o padrão do artigo: a diversidade Shannon não difere
         significativamente entre Controle e Seca (p = 0,145), mas a
         composição da comunidade (Bray-Curtis, PERMANOVA) difere
-        fortemente (p = 0,001) — ou seja, as mesmas bactérias em
+        fortemente (p = 0,001), ou seja, as mesmas bactérias em
         proporções diferentes, não uma comunidade mais ou menos diversa.
         Segundo, roda cinco testes estatísticos diferentes (a{" "}
         <Term id="daa">análise de abundância diferencial</Term>) pra
         descobrir quais bactérias específicas aparecem em quantidade
-        significativamente diferente entre os dois grupos — usar cinco
+        significativamente diferente entre os dois grupos; usar cinco
         métodos ao mesmo tempo, em vez de um só, ajuda a confiar mais no
         resultado quando todos concordam. Os 5 métodos já foram executados
         com sucesso (resultados na seção 5.3).
@@ -478,7 +478,7 @@ print(ps_rare_filtered)
 
 taxa_info <- data.frame(tax_table(ps_rare_filtered)) %>%
   rownames_to_column(var = "ASV")`,
-        caption: "Monta o objeto phyloseq — a estrutura de dados padrão em R para análises de microbioma, unindo contagens, taxonomia e metadados das amostras num só lugar.",
+        caption: "Monta o objeto phyloseq, a estrutura de dados padrão em R para análises de microbioma, unindo contagens, taxonomia e metadados das amostras num só lugar.",
       },
       {
         code: `# -------------------------------------------------------------
@@ -573,7 +573,7 @@ aldex_marker <- aldex_all %>%
   left_join(taxa_info, by = "ASV")
 
 cat("ALDEx2: ", nrow(aldex_marker), "ASVs significativas\\n")`,
-        caption: "Quarto método: ALDEx2, que gera 128 amostras Monte Carlo por ASV para estimar a incerteza da composição antes de testar. O wrapper do microbiomeMarker quebrou por um bug interno, então o ALDEx2 foi chamado direto — daí o código ficar um pouco diferente dos outros quatro métodos.",
+        caption: "Quarto método: ALDEx2, que gera 128 amostras Monte Carlo por ASV para estimar a incerteza da composição antes de testar. O wrapper do microbiomeMarker quebrou por um bug interno, então o ALDEx2 foi chamado direto, daí o código ficar um pouco diferente dos outros quatro métodos.",
       },
       {
         code: `# -------------------------------------------------------------
@@ -624,7 +624,7 @@ dev.off()
 cat("\\nResumo final:\\n")
 print(sapply(upset_list, length))
 cat("\\nGráfico salvo em: upset_daa_comparison.pdf\\n")`,
-        caption: "Reúne as ASVs significativas dos 5 métodos numa lista e gera um gráfico UpSetR — mostra visualmente quantas ASVs cada método achou sozinho e quantas se repetem entre métodos.",
+        caption: "Reúne as ASVs significativas dos 5 métodos numa lista e gera um gráfico UpSetR, mostrando quantas ASVs cada método achou sozinho e quantas se repetem entre métodos.",
       },
       {
         code: `# -------------------------------------------------------------
@@ -768,18 +768,18 @@ cat("Resultados completos salvos em: daa_todos_os_ranks.RData\\n")`,
         <Term id="tsne">t-SNE</Term> é uma técnica de redução de
         dimensionalidade que pega os milhares de valores de abundância de
         cada amostra e projeta tudo num mapa de duas dimensões, fácil de
-        visualizar — amostras parecidas ficam próximas, amostras diferentes
+        visualizar: amostras parecidas ficam próximas, amostras diferentes
         ficam distantes. O objetivo aqui não é bonito, é diagnóstico: se as
         amostras se agruparem principalmente por espécie de planta,
-        compartimento (solo/raiz/rizosfera) ou projeto de origem — em vez
-        de por regime de rega — isso é sinal de{" "}
+        compartimento (solo/raiz/rizosfera) ou projeto de origem, em vez
+        de por regime de rega, isso é sinal de{" "}
         <Term id="vies">viés de agrupamento</Term>, e um Random Forest
         treinado nesses dados corre o risco de aprender a reconhecer
         espécie de planta ou projeto, não seca de verdade. Essa checagem é
         especialmente relevante porque a dissertação pretende combinar
         dados de vários projetos diferentes de soja: se o t-SNE mostrar
         agrupamento por projeto em vez de por sanidade, a validação
-        leave-one-project-out não é opcional — é obrigatória. Resultado
+        leave-one-project-out não é opcional: é obrigatória. Resultado
         real (seção 5.5): compartimento se mostrou o eixo de maior viés,
         mas o sinal de regime de rega se manteve real dentro de cada
         compartimento isolado.
@@ -949,7 +949,7 @@ print("o sinal de estresse hídrico é real, mesmo controlando por compartimento
         amostras que viu. Depois de treinado, a técnica de{" "}
         <Term id="shap">SHAP</Term> é usada pra abrir essa "caixa preta" e
         mostrar exatamente quais bactérias pesaram mais na decisão do
-        modelo — são essas as candidatas a "bactérias marcadoras" de
+        modelo: são essas as candidatas a "bactérias marcadoras" de
         estresse hídrico. Rodado nos 5 níveis taxonômicos (resultados na
         seção 5.6): gênero teve o melhor desempenho (AUC 0,979, quase
         idêntico ao artigo original), e o táxon marcador nº 1 apontado
@@ -979,7 +979,7 @@ done`,
       {
         code: `"""
 Machine Learning: Random Forest + Nested CV + SHAP
-Replicando Hagen et al. (2024) — testa os 5 níveis taxonômicos
+Replicando Hagen et al. (2024), testando os 5 níveis taxonômicos
 (filo a gênero) e interpreta o de melhor desempenho via SHAP.
 """
 
@@ -1235,7 +1235,7 @@ print("\\nTabela completa salva em: concordancia_daa_shap.csv")`,
         autores originais encontraram: a acurácia do modelo ficou parecida
         com a deles, e as bactérias apontadas pelo SHAP como mais
         importantes são as mesmas que o artigo aponta? A resposta, nas
-        duas frentes, foi sim (seção 5.6) — sinal de que o pipeline
+        duas frentes, foi sim (seção 5.6), sinal de que o pipeline
         inteiro, do download dos dados brutos até o modelo final, foi
         reproduzido corretamente.
       </>
@@ -1249,12 +1249,12 @@ print("\\nTabela completa salva em: concordancia_daa_shap.csv")`,
       <>
         Etapa opcional do artigo original: aplicar o Random Forest já
         treinado no Grass-Drought (sem retreinar) num segundo dataset
-        independente — sorgo em vez de gramíneas diversas — pra ver se o
+        independente (sorgo em vez de gramíneas diversas) pra ver se o
         modelo generaliza além do experimento onde foi treinado. Achar o
         dataset certo deu mais trabalho que o esperado (detalhes na seção
         5.8): o BioProject PRJNA435634 mistura sequenciamento shotgun
         (WGS) com amplicon 16S, e ainda tem um lote de amostras de{" "}
-        <em>tomate</em> misturado junto — nada disso serve. O subconjunto
+        <em>tomate</em> misturado junto; nada disso serve. O subconjunto
         certo (16S, sorgo, compartimentos raiz/solo/rizosfera) tem 3
         grupos de tratamento (Controle, seca antes do florescimento, seca
         depois do florescimento), dos quais foram selecionadas 449
@@ -1278,7 +1278,7 @@ qiime tools import \\
   --p-email <email> \\
   --p-threads 4 \\
   --output-dir sequencias_sorghum`,
-        caption: "Baixa as 449 sequências brutas do NCBI SRA — mesmo processo usado para o Grass-Drought.",
+        caption: "Baixa as 449 sequências brutas do NCBI SRA, o mesmo processo usado para o Grass-Drought.",
       },
       {
         code: `qiime cutadapt trim-paired \\
@@ -1288,7 +1288,7 @@ qiime tools import \\
   --p-discard-untrimmed \\
   --p-cores 4 \\
   --output-dir cutadapt_output_sorghum`,
-        caption: "Remove os mesmos primers 341F/785R — a região do 16S sequenciada é a mesma, só muda a espécie de planta.",
+        caption: "Remove os mesmos primers 341F/785R; a região do 16S sequenciada é a mesma, só muda a espécie de planta.",
       },
     ],
   },
@@ -1382,7 +1382,7 @@ function ShannonBoxplot() {
         ))}
       </svg>
       <figcaption>
-        Figura 1. Índice de Shannon por regime de rega — dados extraídos da visualização QIIME 2 (não significativo, p = 0,145).
+        Figura 1. Índice de Shannon por regime de rega, dados extraídos da visualização QIIME 2 (não significativo, p = 0,145).
       </figcaption>
     </figure>
   );
@@ -1981,9 +1981,9 @@ export default function App() {
             </div>
             <div className="doc-authors">Tassiane Anzolin</div>
             <div className="doc-affil">
-              PPGTCA — Universidade Tecnológica Federal do Paraná
+              PPGTCA, Universidade Tecnológica Federal do Paraná
             </div>
-            <div className="doc-note">caderno de acompanhamento — atualizado conforme o trabalho avança</div>
+            <div className="doc-note">caderno de acompanhamento, atualizado conforme o trabalho avança</div>
             <div className="quick-links">
               <a
                 href="https://drive.google.com/drive/folders/1P6-fQb7lEphguY-HU1m537JFc2OMg76R?usp=sharing"
@@ -2003,7 +2003,7 @@ export default function App() {
             <div className="abstract-heading">Resumo</div>
             <p>
               Replicando, do zero, o
-              pipeline do artigo de Hagen et al. (2024) — que usa machine
+              pipeline do artigo de Hagen et al. (2024), que usa machine
               learning pra descobrir se o solo está estressado pela seca só
               olhando pras bactérias que vivem nele. A orientadora pediu
               essa replicação completa (dos dados brutos até o modelo final)
@@ -2022,13 +2022,13 @@ export default function App() {
               perto das raízes de uma planta, dá pra treinar um modelo (um{" "}
               <Term id="randomForest">Random Forest</Term>) que reconhece, só
               pelo perfil dessas bactérias, se a planta está sofrendo com
-              falta d'água. Não é só "prever" — o artigo também mostra{" "}
+              falta d'água. Não é só "prever": o artigo também mostra{" "}
               <em>quais</em> bactérias o modelo usou pra decidir isso,
               usando uma técnica chamada <Term id="shap">SHAP</Term>.
             </p>
             <p>
               O motivo de refazer tudo isso, passo a passo, é que a
-              dissertação vai usar exatamente essa mesma lógica — só que pra
+              dissertação vai usar exatamente essa mesma lógica, mas pra
               soja, e pra sanidade em vez de seca. Antes de aplicar num dado
               que ninguém nunca processou, faz sentido garantir que cada
               etapa funciona num estudo que já tem resultado publicado, pra
@@ -2044,8 +2044,8 @@ export default function App() {
               <em>Grass-Drought</em>, produzido por Naylor, DeGraaf, Purdom e
               Coleman-Derr (2017). Eles plantaram várias espécies de
               gramíneas (e tomate, como grupo de comparação) e dividiram em
-              dois grupos — regados normalmente (Controle) e sob seca
-              (Seca) — coletando amostras de solo, raiz e{" "}
+              dois grupos: regados normalmente (Controle) e sob seca
+              (Seca), coletando amostras de solo, raiz e{" "}
               <Term id="rizosfera">rizosfera</Term> de cada planta.
             </p>
             <table className="formal">
@@ -2095,7 +2095,7 @@ export default function App() {
             <p>
               Um ponto que gerou confusão no início: o{" "}
               <Term id="bioproject">BioProject</Term> inteiro tem 880
-              experimentos, mas boa parte não é desse estudo — há outras
+              experimentos, mas boa parte não é desse estudo: há outras
               plantas misturadas ali, de outras pesquisas do mesmo grupo. A
               lista certa das 623 amostras só apareceu ao consultar
               diretamente o arquivo <em>metadata.csv</em> que acompanha o
@@ -2115,16 +2115,16 @@ export default function App() {
               <li>
                 <span className="concept-icon"><Dna size={16} /></span>
                 <span className="concept-text">
-                  <Term id="asv"><span className="term-name">ASV</span></Term>{" "}
-                  — variante de sequência que representa uma bactéria
+                  <Term id="asv"><span className="term-name">ASV</span></Term>{": "}
+                  variante de sequência que representa uma bactéria
                   específica encontrada na amostra.
                 </span>
               </li>
               <li>
                 <span className="concept-icon"><Sliders size={16} /></span>
                 <span className="concept-text">
-                  <Term id="dada2"><span className="term-name">DADA2</span></Term>{" "}
-                  — o programa que organiza as leituras brutas em ASVs,
+                  <Term id="dada2"><span className="term-name">DADA2</span></Term>{": "}
+                  o programa que organiza as leituras brutas em ASVs,
                   corrigindo erros e removendo{" "}
                   <Term id="quimeras">quimeras</Term>.
                 </span>
@@ -2134,8 +2134,8 @@ export default function App() {
                 <span className="concept-text">
                   <Term id="diversidadeAlfa"><span className="term-name">Diversidade alfa</span></Term>{" "}
                   e{" "}
-                  <Term id="diversidadeBeta"><span className="term-name">diversidade beta</span></Term>{" "}
-                  — o quanto uma amostra é diversa por dentro, e o quanto duas
+                  <Term id="diversidadeBeta"><span className="term-name">diversidade beta</span></Term>{": "}
+                  o quanto uma amostra é diversa por dentro, e o quanto duas
                   amostras diferem entre si.
                 </span>
               </li>
@@ -2143,31 +2143,31 @@ export default function App() {
                 <span className="concept-icon"><BarChart3 size={16} /></span>
                 <span className="concept-text">
                   <Term id="daa"><span className="term-name">DAA</span></Term>{" "}
-                  (Análise de Abundância Diferencial) — os testes que acham
+                  (Análise de Abundância Diferencial): os testes que acham
                   quais bactérias mudam de quantidade entre os grupos.
                 </span>
               </li>
               <li>
                 <span className="concept-icon"><Repeat size={16} /></span>
                 <span className="concept-text">
-                  <Term id="nestedCV"><span className="term-name">Nested CV</span></Term>{" "}
-                  — o jeito cuidadoso de testar o modelo sem deixar ele
+                  <Term id="nestedCV"><span className="term-name">Nested CV</span></Term>{": "}
+                  o jeito cuidadoso de testar o modelo sem deixar ele
                   "colar" nos dados de teste.
                 </span>
               </li>
               <li>
                 <span className="concept-icon"><Brain size={16} /></span>
                 <span className="concept-text">
-                  <Term id="shap"><span className="term-name">SHAP</span></Term>{" "}
-                  — a ferramenta que explica o raciocínio do modelo, bactéria
+                  <Term id="shap"><span className="term-name">SHAP</span></Term>{": "}
+                  a ferramenta que explica o raciocínio do modelo, bactéria
                   por bactéria.
                 </span>
               </li>
               <li>
                 <span className="concept-icon"><FolderTree size={16} /></span>
                 <span className="concept-text">
-                  <Term id="looPo"><span className="term-name">Leave-one-project-out</span></Term>{" "}
-                  — a validação que deixa um projeto inteiro de fora do teste,
+                  <Term id="looPo"><span className="term-name">Leave-one-project-out</span></Term>{": "}
+                  a validação que deixa um projeto inteiro de fora do teste,
                   em vez de amostras soltas. É essa a que a dissertação
                   pretende usar.
                 </span>
@@ -2175,16 +2175,16 @@ export default function App() {
               <li>
                 <span className="concept-icon"><Tag size={16} /></span>
                 <span className="concept-text">
-                  <Term id="silva"><span className="term-name">SILVA</span></Term>{" "}
-                  — o banco de dados que funciona como dicionário pra dar nome
+                  <Term id="silva"><span className="term-name">SILVA</span></Term>{": "}
+                  o banco de dados que funciona como dicionário pra dar nome
                   (<Term id="taxonomia">taxonomia</Term>) a cada ASV.
                 </span>
               </li>
               <li>
                 <span className="concept-icon"><Eye size={16} /></span>
                 <span className="concept-text">
-                  <Term id="qiimeView"><span className="term-name">QIIME 2 View</span></Term>{" "}
-                  — o site usado pra abrir os gráficos e resultados (.qza/.qzv)
+                  <Term id="qiimeView"><span className="term-name">QIIME 2 View</span></Term>{": "}
+                  o site usado pra abrir os gráficos e resultados (.qza/.qzv)
                   gerados pelo QIIME 2, sem precisar instalar nada.
                 </span>
               </li>
@@ -2207,8 +2207,8 @@ export default function App() {
             </div>
             <p>
               Cada etapa abaixo explica o que acontece e por quê, seguida
-              do(s) comando(s) usado(s) — os já executados e os que ainda
-              serão usados mais adiante — para que qualquer pessoa entenda o
+              do(s) comando(s) usado(s) (os já executados e os que ainda
+              serão usados mais adiante) para que qualquer pessoa entenda o
               processo e consiga reproduzi-lo.
             </p>
             {STEPS.map((step) => (
@@ -2252,7 +2252,7 @@ export default function App() {
               amostras. Cada uma foi comparada ao banco{" "}
               <Term id="silva">SILVA</Term>, resultando numa{" "}
               <Term id="taxonomia">taxonomia</Term> atribuída pra 36.446
-              delas (97 ficaram sem classificação — uma taxa de sucesso de
+              delas (97 ficaram , com uma taxa de sucesso de
               99,7%), com confiança média de 0,97 numa escala de 0 a 1.
             </p>
             <table className="formal">
@@ -2270,7 +2270,7 @@ export default function App() {
 
             <p>
               Entre as bactérias identificadas, seis filos concentram a
-              maior parte das ASVs — um filo é um nível bem alto da{" "}
+              maior parte das ASVs; um filo é um nível bem alto da{" "}
               <Term id="taxonomia">taxonomia</Term>, agrupando famílias
               inteiras de bactérias com características em comum:
             </p>
@@ -2303,7 +2303,7 @@ export default function App() {
             <h3 className="sub-title">5.2 Filtro de prevalência e diversidade</h3>
             <p>
               A tabela de ASVs foi filtrada para manter apenas as sequências
-              presentes em pelo menos 5% das 623 amostras — um corte
+              presentes em pelo menos 5% das 623 amostras, um corte
               deliberadamente permissivo, que remove apenas ruído raríssimo
               (sequências vistas em uma ou duas amostras isoladas, prováveis
               erros residuais de sequenciamento) sem descartar táxons
@@ -2313,7 +2313,7 @@ export default function App() {
             <p>
               Sobre essa tabela filtrada, a diversidade foi calculada numa{" "}
               <Term id="rarefacao">profundidade de rarefação</Term> de
-              17.291 leituras por amostra — o mesmo valor usado por Hagen et
+              17.291 leituras por amostra, o mesmo valor usado por Hagen et
               al. (2024), escolhido deliberadamente para permitir
               comparação direta.
             </p>
@@ -2354,15 +2354,14 @@ export default function App() {
                 nos dois testes: nenhuma diferença de diversidade Shannon, e
                 uma diferença altamente significativa na composição via
                 Bray-Curtis. A magnitude do efeito (variância explicada)
-                ficou na mesma ordem de grandeza — 4,1% aqui contra 6,8% no
-                artigo — uma diferença pequena e esperada, já que o total de
+                ficou na mesma ordem de grandeza (4,1% aqui contra 6,8% no
+                artigo), uma diferença pequena e esperada, já que o total de
                 ASVs, o número de amostras retidas (618 vs. o valor
                 reportado no artigo) e detalhes finos de parâmetros de
                 sequenciamento e do ambiente de execução nunca são
-                idênticos entre replicações independentes. O ponto central
-                — Controle e Seca não têm comunidades mais ou menos
+                idênticos entre replicações independentes. O ponto central: Controle e Seca não têm comunidades mais ou menos
                 diversas, mas têm comunidades <em>diferentes</em> em
-                composição — se confirma nos dois casos.
+                composição. Isso se confirma nos dois casos.
               </p>
             </div>
 
@@ -2375,7 +2374,7 @@ export default function App() {
               uma forma diferente de decidir se uma ASV muda de quantidade
               entre Controle e Seca. Rodar cinco ao mesmo tempo, em vez de
               confiar num só, é uma forma de checar se o resultado é
-              robusto — ASVs que aparecem como significativas em vários
+              robusto: ASVs que aparecem como significativas em vários
               métodos ao mesmo tempo são candidatas mais confiáveis a
               táxons marcadores do que as que só um método aponta.
             </p>
@@ -2423,7 +2422,7 @@ export default function App() {
               <div className="callout-label">por que os números variam tanto entre métodos</div>
               <p>
                 Não é motivo de alarme o edgeR e o ALDEx2 discordarem tanto
-                (2.498 vs. 590) — é justamente por isso que o artigo
+                (2.498 vs. 590), é justamente por isso que o artigo
                 original usa cinco métodos e depois cruza os resultados: os
                 cinco fazem suposições estatísticas diferentes sobre como a
                 variância se comporta nos dados, e o ALDEx2 em particular é
@@ -2432,7 +2431,7 @@ export default function App() {
                 sobreposição entre os cinco conjuntos, gerada via{" "}
                 <Term id="upsetPlot">UpSetR</Term>, mostra o número que
                 realmente importa aqui: <strong>668 ASVs foram
-                significativas nos 5 métodos ao mesmo tempo</strong> — esse
+                significativas nos 5 métodos ao mesmo tempo</strong>; esse
                 é o <Term id="consensoDaa">conjunto de consenso</Term> mais
                 confiável de candidatas a táxons marcadores, porque nenhum
                 dos cinco métodos discorda dele. Os próximos maiores grupos
@@ -2444,8 +2443,8 @@ export default function App() {
 
             <p>
               Seguindo o mesmo critério do artigo original, os 3 métodos
-              mais consistentes entre si — <Term id="deseqMethod">DESeq2</Term>,{" "}
-              <Term id="ancombcMethod">ANCOM-BC2</Term> e ALDEx2 — foram
+              mais consistentes entre si (<Term id="deseqMethod">DESeq2</Term>,{" "}
+              <Term id="ancombcMethod">ANCOM-BC2</Term> e ALDEx2) foram
               estendidos aos outros quatro níveis taxonômicos (filo a
               gênero), a mesma estrutura usada depois no Machine Learning:
             </p>
@@ -2469,7 +2468,7 @@ export default function App() {
               ]}
             />
             <div className="table-caption-below">
-              O número de táxons significativos cresce do filo pro gênero —
+              O número de táxons significativos cresce do filo pro gênero,
               esperado, já que existem muito mais gêneros distintos do que
               filos, então há mais "candidatos" a serem significativos em
               cada nível mais granular. Os 3 métodos concordam bem entre si
@@ -2485,8 +2484,8 @@ export default function App() {
               três fatores diferentes (regime de rega, compartimento e
               espécie de planta), mostrou que compartimento
               (solo/raiz/rizosfera) é o eixo de maior variância na
-              comunidade bacteriana — resultado esperado e consistente com
-              Hagen et al. (2024) — enquanto espécie de planta apareceu bem
+              comunidade bacteriana, resultado esperado e consistente com
+              Hagen et al. (2024), enquanto espécie de planta apareceu bem
               misturada, sem indício de confundimento.
             </p>
             <figure className="chart-fig">
@@ -2513,7 +2512,7 @@ export default function App() {
               />
               <figcaption>
                 Figura 3. t-SNE dentro de cada compartimento, colorida só
-                por regime de rega — a separação Controle/Seca varia em
+                por regime de rega: a separação Controle/Seca varia em
                 nitidez, mas aparece nos três painéis.
               </figcaption>
             </figure>
@@ -2550,7 +2549,7 @@ export default function App() {
               <p>
                 O sinal de estresse hídrico é real e está presente nos três
                 compartimentos, não é um artefato do agrupamento por
-                compartimento — mas sua intensidade varia (rizosfera &gt;
+                compartimento, mas sua intensidade varia (rizosfera &gt;
                 raiz &gt; solo). Isso reforça, já nesta réplica, a lógica
                 por trás da validação <Term id="looPo">leave-one-project-out</Term>{" "}
                 planejada para a dissertação (seção 6): mesmo dentro de um
@@ -2592,7 +2591,7 @@ export default function App() {
             />
             <p>
               Igual ao artigo original, o nível de <strong>gênero</strong>{" "}
-              teve o melhor desempenho — e, mais importante, bateu de perto
+              teve o melhor desempenho e, mais importante, bateu de perto
               com os valores publicados:
             </p>
             <table className="formal">
@@ -2611,12 +2610,12 @@ export default function App() {
                 A interpretação via <Term id="shap">SHAP</Term> no nível de
                 gênero apontou o gênero <Term id="kribbella"><em>Kribbella</em></Term>{" "}
                 (família Kribbellaceae) como o táxon marcador mais
-                importante — <strong>exatamente o mesmo</strong> que Hagen
+                importante: <strong>exatamente o mesmo</strong> que Hagen
                 et al. (2024) relataram como o marcador mais consistente no
                 artigo original. Combinado com o AUC praticamente idêntico
                 (0,979 vs. 0,980), essa coincidência é a evidência mais
-                forte de que o pipeline inteiro — do download das
-                sequências brutas até a interpretação do modelo — está
+                forte de que o pipeline inteiro (do download das
+                sequências brutas até a interpretação do modelo) está
                 capturando o mesmo sinal biológico do estudo original, e
                 não um artefato do processamento.
               </p>
@@ -2626,7 +2625,7 @@ export default function App() {
             <p>
               O artigo original também verifica se os táxons apontados
               como significativos pela DAA são os mesmos que o SHAP aponta
-              como importantes — dois caminhos estatísticos diferentes
+              como importantes: dois caminhos estatísticos diferentes
               chegando (ou não) à mesma conclusão biológica. Reproduzindo
               essa lógica no nível de gênero (consenso de pelo menos 2 dos
               3 métodos de DAA, comparado aos táxons de maior peso no
@@ -2647,13 +2646,13 @@ export default function App() {
               <div className="callout-label">leitura do resultado</div>
               <p>
                 61,3% fica um pouco abaixo do artigo original, mas na mesma
-                ordem de grandeza — uma diferença esperada, já que o
+                ordem de grandeza, uma diferença esperada, já que o
                 critério exato usado no código original pra definir
                 "consenso da DAA" e "topo do SHAP" não está disponível
                 publicamente, então essa reprodução usa uma regra
                 equivalente e razoável (não idêntica). O mais importante:{" "}
-                <em>Kribbella</em> — o táxon marcador nº 1 de todo o
-                estudo — está entre os 106 táxons em que as duas
+                <em>Kribbella</em> (o táxon marcador nº 1 de todo o
+                estudo) está entre os 106 táxons em que as duas
                 abordagens concordam, o que reforça pela terceira vez
                 (diversidade, SHAP e agora DAA×SHAP) que esse gênero é um
                 marcador robusto de estresse hídrico neste dataset.
@@ -2664,7 +2663,7 @@ export default function App() {
             <p>
               A última etapa do artigo original testa o modelo treinado no
               Grass-Drought contra um segundo dataset independente, sem
-              retreinar — sorgo em vez de gramíneas diversas. Encontrar os
+              retreinar, testando sorgo em vez de gramíneas diversas. Encontrar os
               dados certos deu bem mais trabalho do que esperado, e vale
               registrar o processo:
             </p>
@@ -2674,7 +2673,7 @@ export default function App() {
                 <span className="concept-text">
                   O BioProject citado no artigo (PRJNA435634) tem 819
                   registros, mas a maioria (47) é sequenciamento{" "}
-                  <em>shotgun</em> (WGS) — incompatível com todo o pipeline
+                  <em>shotgun</em> (WGS), incompatível com todo o pipeline
                   16S construído até aqui.
                 </span>
               </li>
@@ -2683,7 +2682,7 @@ export default function App() {
                 <span className="concept-text">
                   Dentro dos registros amplicon (772), havia um lote de{" "}
                   <em>tomate</em> (não sorgo) de um experimento de estufa
-                  diferente, misturado no mesmo BioProject guarda-chuva —
+                  diferente, misturado no mesmo BioProject guarda-chuva,
                   precisou ser identificado e descartado pelo nome da
                   amostra.
                 </span>
@@ -2694,7 +2693,7 @@ export default function App() {
                   O desenho experimental real tem <strong>3 grupos de
                   tratamento</strong>, não 2: Controle, seca imposta antes
                   do florescimento, e seca imposta depois do florescimento
-                  — uma nuance que não estava óbvia até examinar os dados
+                  , uma nuance que não estava óbvia até examinar os dados
                   de verdade.
                 </span>
               </li>
@@ -2724,7 +2723,7 @@ export default function App() {
                 claramente documentado nas fontes disponíveis. Em vez de
                 adivinhar até bater um número, esta replicação usa um
                 critério próprio, definido de forma explícita e
-                reproduzível (acima) — uma aproximação razoável, não uma
+                reproduzível (acima), uma aproximação razoável, não uma
                 réplica byte-a-byte do subconjunto original. O download e
                 processamento dessas 449 amostras está em andamento; os
                 resultados da etapa 11 (aplicar o modelo já treinado, sem
@@ -2750,7 +2749,7 @@ export default function App() {
               classificar <strong>sanidade em soja</strong> a partir do{" "}
               <Term id="microbioma">microbioma</Term>. A diferença principal
               é combinar dados de{" "}
-              <strong>vários projetos de soja diferentes</strong> — algo que
+              <strong>vários projetos de soja diferentes</strong>, algo que
               a maioria dos trabalhos revisados não trata com cuidado, ou
               seja, treinam e testam misturando tudo, sem checar se o modelo
               está só "decorando" as particularidades de cada projeto.
@@ -2767,7 +2766,7 @@ export default function App() {
             <p>
               Replicar esse pipeline inteiro primeiro é a forma mais direta
               de garantir que, ao chegar nos dados reais de soja, os
-              problemas que aparecerem sejam sobre a ciência em si — e não
+              problemas que aparecerem sejam sobre a ciência em si, e não
               sobre um comando de terminal configurado errado sem perceber.
             </p>
           </section>
@@ -2799,13 +2798,13 @@ export default function App() {
           </section>
 
           <div className="footnote">
-            Isto é um caderno de acompanhamento, não um relatório final — a
+            Isto é um caderno de acompanhamento, não um relatório final: a
             seção 4 vai mudando conforme o trabalho avança de verdade.
           </div>
         </main>
       </div>
 
-      <footer className="pagefoot">— caderno vivo · PPGTCA / UTFPR —</footer>
+      <footer className="pagefoot">caderno vivo · PPGTCA / UTFPR</footer>
     </div>
   );
 }
