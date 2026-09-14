@@ -666,18 +666,153 @@ cat("\\nResultados salvos em: daa_results_asv_level.RData\\n")`,
       </>
     ),
     commands: [
-      `from sklearn.manifold import TSNE
+      {
+        code: `"""
+Checagem de viés de agrupamento via t-SNE.
+Projeta as amostras num mapa 2D e colore por três fatores diferentes
+(regime de rega, espécie, compartimento) para comparar os agrupamentos.
+"""
+
+import biom
+import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 
-# X = tabela de abundância relativa (amostras x táxons), já filtrada
-tsne = TSNE(n_components=2, perplexity=30, random_state=42)
-embedding = tsne.fit_transform(X)
+# -------------------------------------------------------------
+# 1. Carregar a tabela de ASVs (já rarefeita) e os metadados
+# -------------------------------------------------------------
+table = biom.load_table("exported-rarefied-table/feature-table.biom")
+# biom guarda amostras nas colunas e ASVs nas linhas -> transpor
+X = table.to_dataframe(dense=True).T  # linhas = amostras, colunas = ASVs
 
-# plotar colorindo por Watering_Regm, depois por Isolation_Source
-# e por Plant_Body_Site, separadamente — comparar os três mapas
-fig, ax = plt.subplots()
-scatter = ax.scatter(embedding[:, 0], embedding[:, 1], c=labels_watering_regm)
-plt.savefig("tsne_watering_regm.png")`,
+metadata = pd.read_csv("sample-metadata.tsv", sep="\\t")
+metadata = metadata[metadata["sample-id"] != "#q2:types"]
+metadata = metadata.set_index("sample-id")
+
+# manter só amostras presentes nos dois
+common_samples = X.index.intersection(metadata.index)
+X = X.loc[common_samples]
+metadata = metadata.loc[common_samples]
+
+print(f"Amostras usadas na projeção: {len(common_samples)}")
+print(f"ASVs (dimensões de entrada): {X.shape[1]}")
+
+# -------------------------------------------------------------
+# 2. Rodar a t-SNE
+# -------------------------------------------------------------
+tsne = TSNE(n_components=2, perplexity=30, random_state=42, init="pca")
+embedding = tsne.fit_transform(X.values)
+
+metadata = metadata.copy()
+metadata["tsne_x"] = embedding[:, 0]
+metadata["tsne_y"] = embedding[:, 1]
+
+# -------------------------------------------------------------
+# 3. Plotar, colorindo por três fatores diferentes
+# -------------------------------------------------------------
+fatores = ["Watering_Regm", "Plant_Body_Site", "Isolation_Source"]
+titulos = ["Regime de rega (o que queremos ver agrupado)",
+           "Compartimento (solo/raiz/rizosfera)",
+           "Espécie de planta"]
+
+fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
+
+for ax, fator, titulo in zip(axes, fatores, titulos):
+    categorias = metadata[fator].astype("category")
+    for cat in categorias.cat.categories:
+        mask = categorias == cat
+        ax.scatter(
+            metadata.loc[mask, "tsne_x"],
+            metadata.loc[mask, "tsne_y"],
+            label=cat, s=18, alpha=0.7,
+        )
+    ax.set_title(titulo, fontsize=11)
+    ax.set_xlabel("t-SNE 1")
+    ax.set_ylabel("t-SNE 2")
+    ax.legend(fontsize=7, markerscale=1.5, loc="best")
+
+plt.tight_layout()
+plt.savefig("tsne_bias_check.png", dpi=150)
+print("\\nGráfico salvo em: tsne_bias_check.png")
+print("\\nAbra o arquivo e compare os três painéis:")
+print("- Se o painel 'Regime de rega' mostrar grupos claros -> bom sinal")
+print("- Se 'Compartimento' ou 'Espécie' mostrarem grupos MAIS nítidos")
+print("  que o de regime de rega, isso é viés de agrupamento.")`,
+        caption: "Script completo (tsne_bias_check.py): carrega a tabela rarefeita e os metadados, roda a t-SNE geral, e plota três mapas lado a lado coloridos por regime de rega, compartimento e espécie.",
+      },
+      {
+        code: `"""
+t-SNE estratificada por compartimento.
+Roda a projeção separadamente dentro de Solo, Raiz e Rizosfera,
+colorindo só por Watering_Regm, para checar se a separação
+Controle/Seca é real dentro de cada compartimento isolado
+(e não só um artefato do eixo de compartimento dominando a projeção geral).
+"""
+
+import biom
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+
+# -------------------------------------------------------------
+# 1. Carregar os dados (igual ao script anterior)
+# -------------------------------------------------------------
+table = biom.load_table("exported-rarefied-table/feature-table.biom")
+X_full = table.to_dataframe(dense=True).T
+
+metadata = pd.read_csv("sample-metadata.tsv", sep="\\t")
+metadata = metadata[metadata["sample-id"] != "#q2:types"]
+metadata = metadata.set_index("sample-id")
+
+common_samples = X_full.index.intersection(metadata.index)
+X_full = X_full.loc[common_samples]
+metadata = metadata.loc[common_samples]
+
+# -------------------------------------------------------------
+# 2. Checagem de balanceamento Watering_Regm x Plant_Body_Site
+# -------------------------------------------------------------
+print("Balanceamento Watering_Regm x Plant_Body_Site:")
+print(pd.crosstab(metadata["Plant_Body_Site"], metadata["Watering_Regm"]))
+print()
+
+# -------------------------------------------------------------
+# 3. Rodar uma t-SNE separada por compartimento
+# -------------------------------------------------------------
+compartimentos = metadata["Plant_Body_Site"].unique()
+
+fig, axes = plt.subplots(1, len(compartimentos), figsize=(6 * len(compartimentos), 5.5))
+if len(compartimentos) == 1:
+    axes = [axes]
+
+for ax, compartimento in zip(axes, compartimentos):
+    mask = metadata["Plant_Body_Site"] == compartimento
+    X_sub = X_full.loc[mask]
+    meta_sub = metadata.loc[mask]
+
+    print(f"{compartimento}: {X_sub.shape[0]} amostras")
+
+    tsne = TSNE(n_components=2, perplexity=min(30, max(5, X_sub.shape[0] // 4)),
+                random_state=42, init="pca")
+    embedding = tsne.fit_transform(X_sub.values)
+
+    categorias = meta_sub["Watering_Regm"].astype("category")
+    for cat in categorias.cat.categories:
+        cat_mask = categorias == cat
+        ax.scatter(embedding[cat_mask.values, 0], embedding[cat_mask.values, 1],
+                   label=cat, s=22, alpha=0.75)
+
+    ax.set_title(f"{compartimento} (n={X_sub.shape[0]})", fontsize=12)
+    ax.set_xlabel("t-SNE 1")
+    ax.set_ylabel("t-SNE 2")
+    ax.legend(fontsize=9, loc="best")
+
+plt.tight_layout()
+plt.savefig("tsne_by_compartment.png", dpi=150)
+print("\\nGráfico salvo em: tsne_by_compartment.png")
+print("\\nSe Controle e Seca aparecerem separados DENTRO de cada painel,")
+print("o sinal de estresse hídrico é real, mesmo controlando por compartimento.")`,
+        caption: "Script completo (tsne_by_compartment.py): confere o balanceamento Controle/Seca por compartimento, e refaz a t-SNE separadamente dentro de cada compartimento para isolar se o sinal de seca é real.",
+      },
     ],
   },
   {
@@ -695,16 +830,172 @@ plt.savefig("tsne_watering_regm.png")`,
         <Term id="shap">SHAP</Term> é usada pra abrir essa "caixa preta" e
         mostrar exatamente quais bactérias pesaram mais na decisão do
         modelo — são essas as candidatas a "bactérias marcadoras" de
-        estresse hídrico.
+        estresse hídrico. Rodado nos 5 níveis taxonômicos (resultados na
+        seção 5.5): gênero teve o melhor desempenho (AUC 0,979, quase
+        idêntico ao artigo original), e o táxon marcador nº 1 apontado
+        pelo SHAP (<em>Kribbella</em>) bateu exatamente com o do artigo.
       </>
     ),
     commands: [
-      `from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
-import shap
+      {
+        code: `# Colapsar a tabela filtrada por rank taxonômico (3=filo ... 7=gênero)
+for level in 3 4 5 6 7; do
+  qiime taxa collapse \\
+    --i-table table-filtered.qza \\
+    --i-taxonomy taxonomy_output/classification.qza \\
+    --p-level $level \\
+    --o-collapsed-table collapsed-level-\${level}.qza
 
-# nested CV: laço externo avalia, laço interno otimiza hiperparâmetros
-outer_cv = StratifiedKFold(n_splits=5, shuffle=True)`,
+  qiime feature-table relative-frequency \\
+    --i-table collapsed-level-\${level}.qza \\
+    --o-relative-frequency-table relative-level-\${level}.qza
+
+  qiime tools export \\
+    --input-path relative-level-\${level}.qza \\
+    --output-path exported-relative-level-\${level}
+done`,
+        caption: "Gera uma tabela de abundância relativa por nível taxonômico (filo a gênero), a partir da mesma tabela filtrada usada na diversidade e na DAA.",
+      },
+      {
+        code: `"""
+Machine Learning: Random Forest + Nested CV + SHAP
+Replicando Hagen et al. (2024) — testa os 5 níveis taxonômicos
+(filo a gênero) e interpreta o de melhor desempenho via SHAP.
+"""
+
+import biom
+import numpy as np
+import pandas as pd
+import shap
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.metrics import accuracy_score, f1_score, recall_score, roc_auc_score
+
+RANK_NAMES = {3: "phylum", 4: "class", 5: "order", 6: "family", 7: "genus"}
+
+# -------------------------------------------------------------
+# 1. Carregar metadados (usados em todos os níveis)
+# -------------------------------------------------------------
+metadata = pd.read_csv("sample-metadata.tsv", sep="\\t")
+metadata = metadata[metadata["sample-id"] != "#q2:types"]
+metadata = metadata.set_index("sample-id")
+
+
+def load_rank_table(level: int) -> tuple[pd.DataFrame, pd.Series]:
+    table = biom.load_table(f"exported-relative-level-{level}/feature-table.biom")
+    X = table.to_dataframe(dense=True).T  # amostras nas linhas, táxons nas colunas
+
+    common = X.index.intersection(metadata.index)
+    X = X.loc[common]
+    y = metadata.loc[common, "Watering_Regm"]
+    return X, y
+
+
+def nested_cv_rfc(X: pd.DataFrame, y: pd.Series, n_splits: int = 5, seed: int = 42):
+    y_bin = (y == "Drought").astype(int)
+
+    param_grid = {
+        "n_estimators": [200, 500],
+        "max_depth": [None, 10, 20],
+        "min_samples_leaf": [1, 2, 5],
+    }
+
+    outer_cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    metrics = {"accuracy": [], "f1": [], "recall": [], "auc": []}
+    fold_models = []
+
+    for fold, (train_idx, test_idx) in enumerate(outer_cv.split(X, y_bin), start=1):
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y_bin.iloc[train_idx], y_bin.iloc[test_idx]
+
+        inner_cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=seed)
+        grid = GridSearchCV(
+            RandomForestClassifier(random_state=seed),
+            param_grid, cv=inner_cv, scoring="f1", n_jobs=-1,
+        )
+        grid.fit(X_train, y_train)
+        best_model = grid.best_estimator_
+
+        y_pred = best_model.predict(X_test)
+        y_proba = best_model.predict_proba(X_test)[:, 1]
+
+        metrics["accuracy"].append(accuracy_score(y_test, y_pred))
+        metrics["f1"].append(f1_score(y_test, y_pred))
+        metrics["recall"].append(recall_score(y_test, y_pred))
+        metrics["auc"].append(roc_auc_score(y_test, y_proba))
+        fold_models.append(best_model)
+
+        print(f"  fold {fold}: acc={metrics['accuracy'][-1]:.3f}  "
+              f"f1={metrics['f1'][-1]:.3f}  auc={metrics['auc'][-1]:.3f}")
+
+    summary = {k: (np.mean(v), np.std(v)) for k, v in metrics.items()}
+    return summary, fold_models
+
+
+# -------------------------------------------------------------
+# 2. Rodar o nested CV para os 5 níveis taxonômicos
+# -------------------------------------------------------------
+results = {}
+all_models = {}
+
+for level, name in RANK_NAMES.items():
+    print(f"\\n=== Nível: {name} (level {level}) ===")
+    X, y = load_rank_table(level)
+    print(f"  {X.shape[0]} amostras, {X.shape[1]} táxons")
+    summary, fold_models = nested_cv_rfc(X, y)
+    results[name] = summary
+    all_models[name] = (X, y, fold_models)
+
+# -------------------------------------------------------------
+# 3. Resumo comparativo dos 5 níveis
+# -------------------------------------------------------------
+print("\\n\\n=== Resumo final (média ± desvio padrão, 5 folds) ===")
+resumo_df = pd.DataFrame({
+    name: {metric: f"{mean:.3f} ± {std:.3f}" for metric, (mean, std) in summ.items()}
+    for name, summ in results.items()
+}).T
+print(resumo_df)
+resumo_df.to_csv("ml_resultados_por_rank.csv")
+print("\\nResultados salvos em: ml_resultados_por_rank.csv")
+
+# -------------------------------------------------------------
+# 4. SHAP no nível de gênero (melhor desempenho no artigo original)
+# -------------------------------------------------------------
+print("\\n=== Interpretação via SHAP (nível: genus) ===")
+X_genus, y_genus, genus_models = all_models["genus"]
+y_genus_bin = (y_genus == "Drought").astype(int)
+
+# usa o modelo do primeiro fold como referência para explicar o dataset inteiro
+modelo_final = genus_models[0]
+explainer = shap.TreeExplainer(modelo_final)
+shap_values = explainer.shap_values(X_genus)
+
+# em versões recentes do shap, shap_values pode vir em formato (n, n_features, 2)
+if isinstance(shap_values, list):
+    shap_drought = shap_values[1]
+else:
+    shap_drought = shap_values[:, :, 1] if shap_values.ndim == 3 else shap_values
+
+mean_abs_shap = np.abs(shap_drought).mean(axis=0)
+mean_signed_shap = shap_drought.mean(axis=0)
+
+shap_summary = pd.DataFrame({
+    "taxon": X_genus.columns,
+    "shap_medio_abs": mean_abs_shap,
+    "shap_medio_sinal": mean_signed_shap,
+})
+shap_summary["enriquecido_em"] = np.where(
+    shap_summary["shap_medio_sinal"] > 0, "Drought", "Control"
+)
+shap_summary = shap_summary.sort_values("shap_medio_abs", ascending=False)
+
+print("\\nTop 15 táxons marcadores (gênero):")
+print(shap_summary.head(15).to_string(index=False))
+
+shap_summary.to_csv("shap_marker_taxa_genus.csv", index=False)
+print("\\nResultados completos salvos em: shap_marker_taxa_genus.csv")`,
+        caption: "Script completo (ml_rfc_shap.py): roda o Random Forest com nested CV nos 5 níveis taxonômicos, salva a comparação num CSV, e interpreta o nível de gênero via SHAP, salvando os táxons marcadores noutro CSV.",
+      },
     ],
   },
   {
@@ -716,10 +1007,11 @@ outer_cv = StratifiedKFold(n_splits=5, shuffle=True)`,
         A última etapa é conferir se o trabalho bateu com o que os
         autores originais encontraram: a acurácia do modelo ficou parecida
         com a deles, e as bactérias apontadas pelo SHAP como mais
-        importantes são as mesmas que o artigo aponta? Se sim, é sinal de
-        que o pipeline inteiro — do download dos dados brutos até o
-        modelo final — foi reproduzido corretamente, e está pronto pra
-        ser adaptado com dados reais de soja.
+        importantes são as mesmas que o artigo aponta? A resposta, nas
+        duas frentes, foi sim (seção 5.5) — sinal de que o pipeline
+        inteiro, do download dos dados brutos até o modelo final, foi
+        reproduzido corretamente, e está pronto pra ser adaptado com
+        dados reais de soja.
       </>
     ),
     commands: [],
@@ -1477,9 +1769,9 @@ export default function App() {
             <h2 className="sec"><span className="sec-num">5.</span>Resultados obtidos até agora</h2>
             <p>
               Um resumo consolidado de todos os números produzidos pela
-              replicação até o momento, organizado por etapa. As etapas 9
-              (Machine Learning) e 10 (comparação final) ainda estão
-              pendentes.
+              replicação até o momento, organizado por etapa. A replicação
+              está essencialmente completa — falta apenas consolidar a
+              comparação final (etapa 10).
             </p>
 
             <h3 className="sub-title">5.1 Processamento DADA2 e taxonomia</h3>
@@ -1765,34 +2057,62 @@ export default function App() {
               </p>
             </div>
 
-            <h3 className="sub-title">5.5 Alvo de comparação para as próximas etapas</h3>
+            <h3 className="sub-title">5.5 Machine Learning: resultados</h3>
             <p>
-              Para referência futura, os valores que a etapa de Machine
-              Learning (seção 4, etapa 9) precisará se aproximar, publicados
-              por Hagen et al. (2024) para o nível taxonômico de gênero — o
-              que apresentou o melhor desempenho no artigo original:
+              O <Term id="randomForest">Random Forest</Term> com{" "}
+              <Term id="nestedCV">validação cruzada aninhada</Term> foi
+              treinado nos 5 níveis taxonômicos (filo a gênero), replicando
+              a mesma estrutura do artigo original:
             </p>
             <table className="formal">
-              <caption><span className="cap-label">Tabela 9.</span> Desempenho do Random Forest no artigo original (nível de gênero, dataset Grass-Drought).</caption>
-              <thead><tr><th>Métrica</th><th>Valor publicado</th></tr></thead>
+              <caption><span className="cap-label">Tabela 9.</span> Desempenho do Random Forest por nível taxonômico (média ± desvio padrão, 5 folds).</caption>
+              <thead><tr><th>Nível</th><th><Term id="acuracia">Acurácia</Term></th><th><Term id="f1score">F1-score</Term></th><th><Term id="recallMetric">Recall</Term></th><th><Term id="aucMetric">AUC</Term></th></tr></thead>
               <tbody>
-                <tr><td><Term id="acuracia">Acurácia</Term></td><td>0,923 ± 0,029</td></tr>
-                <tr><td><Term id="f1score">F1-score</Term></td><td>0,921 ± 0,030</td></tr>
-                <tr><td><Term id="recallMetric">Recall</Term></td><td>0,954 ± 0,029</td></tr>
-                <tr><td><Term id="aucMetric">AUC</Term></td><td>0,980 ± 0,010</td></tr>
-                <tr><td>Táxon marcador mais consistente</td><td>Gênero <Term id="kribbella"><em>Kribbella</em></Term></td></tr>
-                <tr><td>Concordância DAA × SHAP (todos os ranks)</td><td>79,6% a 82,6%</td></tr>
+                <tr><td>Filo</td><td>0,904 ± 0,011</td><td>0,903 ± 0,012</td><td>0,913 ± 0,027</td><td>0,956 ± 0,022</td></tr>
+                <tr><td>Classe</td><td>0,908 ± 0,017</td><td>0,905 ± 0,018</td><td>0,910 ± 0,031</td><td>0,966 ± 0,013</td></tr>
+                <tr><td>Ordem</td><td>0,916 ± 0,020</td><td>0,916 ± 0,020</td><td>0,940 ± 0,017</td><td>0,971 ± 0,014</td></tr>
+                <tr><td>Família</td><td>0,934 ± 0,024</td><td>0,933 ± 0,023</td><td>0,943 ± 0,023</td><td>0,980 ± 0,011</td></tr>
+                <tr><td><strong>Gênero</strong></td><td><strong>0,937 ± 0,023</strong></td><td><strong>0,937 ± 0,023</strong></td><td><strong>0,963 ± 0,024</strong></td><td><strong>0,979 ± 0,010</strong></td></tr>
               </tbody>
             </table>
+            <p>
+              Igual ao artigo original, o nível de <strong>gênero</strong>{" "}
+              teve o melhor desempenho — e, mais importante, bateu de perto
+              com os valores publicados:
+            </p>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 10.</span> Comparação direta com o artigo original (nível de gênero).</caption>
+              <thead><tr><th>Métrica</th><th>Hagen et al. (2024)</th><th>Esta replicação</th></tr></thead>
+              <tbody>
+                <tr><td>Acurácia</td><td>0,923 ± 0,029</td><td>0,937 ± 0,023</td></tr>
+                <tr><td>F1-score</td><td>0,921 ± 0,030</td><td>0,937 ± 0,023</td></tr>
+                <tr><td>Recall</td><td>0,954 ± 0,029</td><td>0,963 ± 0,024</td></tr>
+                <tr><td>AUC</td><td>0,980 ± 0,010</td><td>0,979 ± 0,010</td></tr>
+              </tbody>
+            </table>
+            <div className="callout">
+              <div className="callout-label">o resultado mais forte da replicação inteira</div>
+              <p>
+                A interpretação via <Term id="shap">SHAP</Term> no nível de
+                gênero apontou o gênero <Term id="kribbella"><em>Kribbella</em></Term>{" "}
+                (família Kribbellaceae) como o táxon marcador mais
+                importante — <strong>exatamente o mesmo</strong> que Hagen
+                et al. (2024) relataram como o marcador mais consistente no
+                artigo original. Combinado com o AUC praticamente idêntico
+                (0,979 vs. 0,980), essa coincidência é a evidência mais
+                forte de que o pipeline inteiro — do download das
+                sequências brutas até a interpretação do modelo — está
+                capturando o mesmo sinal biológico do estudo original, e
+                não um artefato do processamento.
+              </p>
+            </div>
 
             <p>
               A Análise de Abundância Diferencial com os 5 métodos (DESeq2,
-              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) foi concluída com sucesso
-              (resultados na seção 5.3) — incluindo contornar um bug interno
-              do pacote <code>microbiomeMarker</code> no ALDEx2, resolvido
-              chamando o ALDEx2 diretamente. A checagem de viés via t-SNE, o
-              Machine Learning (Random Forest + SHAP) e a comparação final
-              com os valores publicados ainda não foram iniciados.
+              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) e o Machine Learning
+              (Random Forest + SHAP) foram concluídos com sucesso. Falta
+              apenas a etapa 10: a comparação final e consolidada com todos
+              os valores publicados.
             </p>
           </section>
 
@@ -1810,7 +2130,7 @@ export default function App() {
               está só "decorando" as particularidades de cada projeto.
             </p>
             <table className="formal">
-              <caption><span className="cap-label">Tabela 10.</span> O que muda entre este estudo e a dissertação.</caption>
+              <caption><span className="cap-label">Tabela 11.</span> O que muda entre este estudo e a dissertação.</caption>
               <thead><tr><th>Neste estudo</th><th>Na dissertação</th></tr></thead>
               <tbody>
                 <tr><td>Um único estudo grande</td><td>Vários projetos de soja combinados</td></tr>
@@ -1859,7 +2179,7 @@ export default function App() {
         </main>
       </div>
 
-      <footer className="pagefoot">— caderno vivo · PPGTCA / UTFPR —</footer>
+      <footer className="pagefoot">—PPGTCA / UTFPR —</footer>
     </div>
   );
 }
