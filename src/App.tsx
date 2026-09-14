@@ -1991,10 +1991,10 @@ export default function App() {
                 rel="noreferrer"
                 className="quick-link"
               >
-                📁 Todos os arquivos (Drive)
+                Drive
               </a>
               <a href="./apresentacao.html" target="_blank" rel="noreferrer" className="quick-link">
-                🎞️ Apresentação de slides
+                Slides
               </a>
             </div>
           </div>
