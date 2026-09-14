@@ -48,10 +48,10 @@ function MiniLine({
   const scaleY = (v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * plotH;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: 620 }}>
-      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#5b6b7a" />
-      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#5b6b7a" />
+      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#c7bd9e" />
+      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#c7bd9e" />
       {categories.map((c, i) => (
-        <text key={c} x={scaleX(i)} y={H - padB + 20} textAnchor="middle" fontSize="13" fill="#cfd8e3">
+        <text key={c} x={scaleX(i)} y={H - padB + 20} textAnchor="middle" fontSize="13" fill="#5a5a5a">
           {c}
         </text>
       ))}
@@ -80,11 +80,15 @@ function Kicker({ children }: { children: React.ReactNode }) {
 
 function Bullets({ items }: { items: React.ReactNode[] }) {
   return (
-    <ul className="bullets">
-      {items.map((it, i) => (
-        <li key={i}>{it}</li>
-      ))}
-    </ul>
+    <div className="card-block">
+      <div className="card-block-body">
+        <ul className="bullets">
+          {items.map((it, i) => (
+            <li key={i}>{it}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -641,21 +645,21 @@ export default function Apresentacao() {
     <div className="deck">
       <style>{`
         :root {
-          --bg: #10151d;
-          --bg-alt: #161d27;
-          --ink: #eef2f6;
-          --ink-soft: #9fb0c0;
-          --accent: #e8b04b;
-          --accent-2: #6fa3ae;
-          --accent-3: #8aa26a;
-          --rule: #2a3543;
-          --font-serif: "Iowan Old Style", Georgia, "Times New Roman", serif;
+          --navy: #10151d;
+          --gold: #f2b632;
+          --gold-deep: #e0a01f;
+          --cream: #fdecc5;
+          --ink: #1a1a1a;
+          --ink-soft: #5a5a5a;
+          --rule: #e7ddc0;
+          --red: #c0392b;
+          --font-serif: Georgia, "Times New Roman", serif;
           --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
         }
         * { box-sizing: border-box; }
         html, body, #root { height: 100%; margin: 0; }
         .deck {
-          background: var(--bg);
+          background: #fbfaf6;
           color: var(--ink);
           font-family: var(--font-sans);
           height: 100vh;
@@ -672,83 +676,149 @@ export default function Apresentacao() {
         }
         .progress-fill {
           height: 100%;
-          background: var(--accent);
+          background: var(--gold);
           transition: width 0.35s ease;
         }
         .stage {
           flex: 1;
           position: relative;
           display: flex;
-          align-items: center;
+          align-items: stretch;
           justify-content: center;
-          padding: 0 8vw;
+          overflow: hidden;
+        }
+        .corner-accent {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 220px;
+          height: 220px;
+          overflow: hidden;
+          pointer-events: none;
+          z-index: 1;
+        }
+        .corner-accent::before {
+          content: "";
+          position: absolute;
+          top: -60px;
+          right: -60px;
+          width: 300px;
+          height: 300px;
+          background: var(--navy);
+          transform: rotate(45deg);
+        }
+        .corner-accent::after {
+          content: "";
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 100%;
+          height: 100%;
+          background-image: repeating-linear-gradient(
+            -45deg,
+            var(--gold) 0px, var(--gold) 2px,
+            transparent 2px, transparent 14px
+          );
+          opacity: 0.9;
         }
         .slide {
           position: absolute;
           inset: 0;
           display: flex;
           flex-direction: column;
-          justify-content: center;
-          padding: 0 8vw;
-          animation: slideIn 0.45s ease both;
+          justify-content: flex-start;
+          padding: 60px 7vw 70px;
+          animation: slideIn 0.4s ease both;
+          overflow-y: auto;
         }
         @keyframes slideIn {
-          from { opacity: 0; transform: translateY(18px); }
+          from { opacity: 0; transform: translateY(14px); }
           to { opacity: 1; transform: translateY(0); }
         }
         .slide.section-slide {
-          align-items: flex-start;
           justify-content: center;
-          background: linear-gradient(135deg, var(--bg) 60%, var(--bg-alt));
+          background: var(--navy);
+          color: #fdecc5;
         }
         .slide.title-slide {
-          align-items: flex-start;
           justify-content: center;
+          align-items: flex-start;
         }
         .kicker {
           font-family: var(--font-sans);
-          font-size: 13px;
+          font-size: 12.5px;
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: var(--accent);
-          margin-bottom: 14px;
-          font-weight: 600;
+          color: var(--gold-deep);
+          margin-bottom: 10px;
+          font-weight: 700;
         }
+        .section-slide .kicker { color: var(--gold); }
         h1.title-xl {
           font-family: var(--font-serif);
-          font-size: clamp(28px, 4.2vw, 54px);
-          line-height: 1.15;
-          margin: 0 0 20px;
-          max-width: 16ch;
+          font-weight: 700;
+          font-size: clamp(26px, 3.6vw, 46px);
+          line-height: 1.2;
+          margin: 0 0 18px;
+          max-width: 18ch;
+          color: var(--ink);
         }
         h2 {
           font-family: var(--font-serif);
-          font-size: clamp(24px, 3.2vw, 40px);
-          margin: 0 0 22px;
-          line-height: 1.2;
+          font-weight: 700;
+          font-size: clamp(22px, 2.8vw, 34px);
+          margin: 0 0 20px;
+          line-height: 1.25;
+          color: var(--ink);
         }
-        h2.highlight-title { color: var(--accent); }
+        .section-slide h2 { color: #fdecc5; }
+        h2.highlight-title { color: var(--gold-deep); }
         .subtitle {
-          font-size: clamp(15px, 1.6vw, 20px);
+          font-size: clamp(14px, 1.4vw, 18px);
           color: var(--ink-soft);
-          max-width: 46ch;
-          margin: 0 0 24px;
+          max-width: 48ch;
+          margin: 0 0 22px;
         }
         .title-meta {
-          font-size: 14px;
+          font-size: 13px;
           color: var(--ink-soft);
-          border-top: 1px solid var(--rule);
-          padding-top: 14px;
-          max-width: 50ch;
+          border-top: 2px solid var(--gold);
+          padding-top: 12px;
+          max-width: 52ch;
         }
         .lede {
-          font-size: clamp(16px, 1.8vw, 22px);
+          font-size: clamp(15px, 1.5vw, 19px);
           color: var(--ink);
-          max-width: 56ch;
-          line-height: 1.5;
-          margin: 0 0 12px;
+          max-width: 58ch;
+          line-height: 1.55;
+          margin: 0 0 10px;
         }
-        .lede.small { font-size: clamp(13px, 1.3vw, 16px); color: var(--ink-soft); }
+        .section-slide .lede { color: #fdecc5; }
+        .lede.small { font-size: clamp(12.5px, 1.15vw, 14.5px); color: var(--ink-soft); }
+        .section-slide .lede.small { color: #cbb98a; }
+
+        .card-block {
+          background: var(--cream);
+          border-radius: 10px;
+          overflow: hidden;
+          max-width: 66ch;
+          margin-bottom: 14px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .section-slide .card-block {
+          background: rgba(253,236,197,0.1);
+          box-shadow: none;
+          border: 1px solid rgba(253,236,197,0.25);
+        }
+        .card-block-head {
+          background: var(--gold);
+          color: #2a1f04;
+          font-weight: 700;
+          font-size: clamp(13px, 1.3vw, 16px);
+          padding: 8px 16px;
+        }
+        .card-block-body { padding: 10px 18px 14px; }
+
         .bullets {
           list-style: none;
           padding: 0;
@@ -756,104 +826,106 @@ export default function Apresentacao() {
           max-width: 62ch;
         }
         .bullets li {
-          font-size: clamp(15px, 1.6vw, 20px);
+          font-size: clamp(14px, 1.35vw, 18px);
           line-height: 1.5;
-          padding: 10px 0 10px 28px;
+          padding: 8px 0 8px 26px;
           position: relative;
-          border-bottom: 1px solid var(--rule);
         }
         .bullets li::before {
-          content: "→";
+          content: "●";
+          font-size: 8px;
           position: absolute;
-          left: 0;
-          color: var(--accent);
+          left: 2px;
+          top: 15px;
+          color: var(--gold-deep);
         }
-        .bullets li:last-child { border-bottom: none; }
+        .section-slide .bullets li::before { color: var(--gold); }
         .agenda-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 10px 40px;
-          max-width: 70ch;
-          font-size: clamp(14px, 1.5vw, 18px);
+          gap: 9px 40px;
+          max-width: 72ch;
+          font-size: clamp(13px, 1.3vw, 16.5px);
         }
-        .agenda-grid strong { color: var(--accent); margin-right: 8px; }
+        .agenda-grid strong { color: var(--gold-deep); margin-right: 8px; }
         .section-num {
           font-family: var(--font-serif);
-          font-size: clamp(60px, 9vw, 140px);
-          color: var(--rule);
+          font-size: clamp(54px, 7.5vw, 120px);
+          color: var(--gold);
           line-height: 1;
           margin-bottom: 0.1em;
+          opacity: 0.85;
         }
-        .section-title {
-          font-size: clamp(26px, 3.6vw, 48px);
-        }
+        .section-title { font-size: clamp(24px, 3.2vw, 42px); }
         .pipeline-strip {
           display: flex;
           flex-wrap: wrap;
-          gap: 10px;
-          max-width: 80ch;
+          gap: 9px;
+          max-width: 82ch;
         }
         .pipeline-node {
           display: flex;
           align-items: center;
           gap: 8px;
-          background: var(--bg-alt);
+          background: var(--cream);
           border: 1px solid var(--rule);
           border-radius: 20px;
-          padding: 6px 14px 6px 8px;
+          padding: 5px 14px 5px 6px;
         }
         .pipeline-num {
-          background: var(--accent);
-          color: #1a1408;
+          background: var(--gold);
+          color: #2a1f04;
           font-weight: 700;
-          font-size: 12px;
-          width: 20px;
-          height: 20px;
+          font-size: 11.5px;
+          width: 19px;
+          height: 19px;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-shrink: 0;
         }
-        .pipeline-label { font-size: 13px; }
-        .mini-bar { max-width: 60ch; margin-top: 12px; }
-        .mini-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .mini-bar-label { width: 110px; font-size: 13px; color: var(--ink-soft); flex-shrink: 0; }
-        .mini-bar-track { flex: 1; height: 14px; background: var(--rule); border-radius: 4px; overflow: hidden; }
-        .mini-bar-fill { height: 100%; background: var(--accent); }
-        .mini-bar-value { font-size: 12.5px; color: var(--ink-soft); width: 60px; text-align: right; }
+        .pipeline-label { font-size: 12.5px; color: var(--ink); }
+        .mini-bar { max-width: 60ch; margin-top: 10px; }
+        .mini-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+        .mini-bar-label { width: 108px; font-size: 12.5px; color: var(--ink-soft); flex-shrink: 0; }
+        .mini-bar-track { flex: 1; height: 13px; background: var(--rule); border-radius: 4px; overflow: hidden; }
+        .mini-bar-fill { height: 100%; background: var(--gold); }
+        .mini-bar-value { font-size: 12px; color: var(--ink-soft); width: 58px; text-align: right; }
         .two-col {
           display: flex;
-          gap: 24px;
-          margin: 10px 0 18px;
+          gap: 20px;
+          margin: 8px 0 16px;
           flex-wrap: wrap;
         }
         .stat-card {
-          background: var(--bg-alt);
-          border: 1px solid var(--rule);
+          background: var(--cream);
           border-radius: 10px;
-          padding: 18px 24px;
-          min-width: 200px;
+          padding: 16px 22px;
+          min-width: 190px;
+          border-top: 4px solid var(--gold);
         }
-        .stat-card.highlight { border-color: var(--accent); }
-        .stat-label { font-size: 12.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
-        .stat-value { font-family: var(--font-serif); font-size: 32px; margin: 6px 0; }
-        .stat-note { font-size: 12.5px; color: var(--ink-soft); }
+        .stat-card.highlight { border-top-color: var(--red); }
+        .stat-label { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+        .stat-value { font-family: var(--font-serif); font-weight: 700; font-size: 28px; margin: 5px 0; color: var(--ink); }
+        .stat-note { font-size: 12px; color: var(--ink-soft); }
         table.pres-table {
           border-collapse: collapse;
-          font-size: clamp(13px, 1.4vw, 17px);
+          font-size: clamp(12.5px, 1.2vw, 15.5px);
           max-width: 70ch;
         }
         table.pres-table th, table.pres-table td {
           text-align: left;
-          padding: 8px 22px 8px 0;
+          padding: 7px 20px 7px 0;
           border-bottom: 1px solid var(--rule);
         }
-        table.pres-table th { color: var(--accent); font-weight: 600; font-size: 0.85em; }
+        table.pres-table th { color: var(--gold-deep); font-weight: 700; font-size: 0.85em; }
         .thanks {
           font-family: var(--font-serif);
-          font-size: clamp(24px, 3vw, 36px);
-          color: var(--accent);
-          margin-top: 20px;
+          font-weight: 700;
+          font-size: clamp(22px, 2.6vw, 32px);
+          color: var(--gold);
+          margin-top: 18px;
         }
         .nav-zone {
           position: absolute;
@@ -865,28 +937,44 @@ export default function Apresentacao() {
         }
         .nav-zone.left { left: 0; }
         .nav-zone.right { right: 0; }
-        .controls {
+        .footer-bar {
           position: absolute;
-          bottom: 18px;
-          right: 28px;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 26px;
+          background: var(--gold);
           display: flex;
           align-items: center;
-          gap: 14px;
-          font-size: 13px;
-          color: var(--ink-soft);
+          justify-content: space-between;
+          padding: 0 16px;
+          font-size: 10.5px;
+          color: #2a1f04;
           z-index: 6;
         }
+        .footer-bar .center { opacity: 0.85; }
+        .controls {
+          position: absolute;
+          bottom: 34px;
+          right: 20px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 12px;
+          color: var(--ink-soft);
+          z-index: 7;
+        }
         .controls button {
-          background: var(--bg-alt);
+          background: #fff;
           border: 1px solid var(--rule);
           color: var(--ink);
-          width: 34px;
-          height: 34px;
+          width: 30px;
+          height: 30px;
           border-radius: 50%;
           cursor: pointer;
-          font-size: 16px;
+          font-size: 15px;
         }
-        .controls button:hover { border-color: var(--accent); color: var(--accent); }
+        .controls button:hover { border-color: var(--gold-deep); color: var(--gold-deep); }
       `}</style>
 
       <div className="progress-track">
@@ -902,13 +990,19 @@ export default function Apresentacao() {
         >
           {slide.content}
         </div>
+        <div className="corner-accent" />
         <div className="nav-zone left" onClick={goPrev} />
         <div className="nav-zone right" onClick={goNext} />
       </div>
 
+      <div className="footer-bar">
+        <span>Tassiane Anzolin · PPGTCA/UTFPR</span>
+        <span className="center">Réplica Hagen et al. (2024) — microbioma e estresse hídrico</span>
+        <span>{index + 1} / {slides.length}</span>
+      </div>
+
       <div className="controls">
         <button onClick={goPrev} aria-label="Anterior">‹</button>
-        <span>{index + 1} / {slides.length}</span>
         <button onClick={goNext} aria-label="Próximo">›</button>
       </div>
     </div>
