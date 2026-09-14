@@ -1427,6 +1427,143 @@ function BarChart({
   );
 }
 
+/** Gráfico de linhas simples, multi-série, estilo acadêmico (ink only). */
+function LineChart({
+  categories,
+  series,
+  yMin = 0,
+  yMax = 1,
+  yTicks = 5,
+}: {
+  categories: string[];
+  series: { label: string; values: number[]; dashed?: boolean }[];
+  yMin?: number;
+  yMax?: number;
+  yTicks?: number;
+}) {
+  const W = 460;
+  const H = 240;
+  const padL = 42;
+  const padR = 16;
+  const padT = 14;
+  const padB = 34;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const scaleX = (i: number) => padL + (i / (categories.length - 1)) * plotW;
+  const scaleY = (v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+
+  const ticks = Array.from({ length: yTicks + 1 }, (_, i) => yMin + (i * (yMax - yMin)) / yTicks);
+
+  return (
+    <figure className="chart-fig">
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Gráfico de linhas">
+        <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="var(--ink)" />
+        <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="var(--ink)" />
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={padL - 4} y1={scaleY(t)} x2={padL} y2={scaleY(t)} stroke="var(--ink)" />
+            <text x={padL - 8} y={scaleY(t) + 3} textAnchor="end" fontSize="9.5" fill="var(--ink-soft)">
+              {t.toFixed(2)}
+            </text>
+          </g>
+        ))}
+        {categories.map((c, i) => (
+          <text key={c} x={scaleX(i)} y={H - padB + 16} textAnchor="middle" fontSize="10" fill="var(--ink)">
+            {c}
+          </text>
+        ))}
+        {series.map((s) => (
+          <g key={s.label}>
+            <polyline
+              fill="none"
+              stroke="var(--ink)"
+              strokeWidth={1.5}
+              strokeDasharray={s.dashed ? "4,3" : undefined}
+              points={s.values.map((v, i) => `${scaleX(i)},${scaleY(v)}`).join(" ")}
+            />
+            {s.values.map((v, i) => (
+              <circle key={i} cx={scaleX(i)} cy={scaleY(v)} r={2.5} fill={s.dashed ? "#fff" : "var(--ink)"} stroke="var(--ink)" />
+            ))}
+          </g>
+        ))}
+      </svg>
+      <div className="line-legend">
+        {series.map((s) => (
+          <span key={s.label} className="line-legend-item">
+            <span className={`line-swatch ${s.dashed ? "dashed" : ""}`} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </figure>
+  );
+}
+
+/** Gráfico de barras agrupadas (várias séries lado a lado por categoria). */
+function GroupedBarChart({
+  categories,
+  series,
+}: {
+  categories: string[];
+  series: { label: string; values: number[] }[];
+}) {
+  const W = 460;
+  const padL = 16;
+  const padR = 16;
+  const padT = 16;
+  const padB = 30;
+  const groupGap = 18;
+  const barGap = 3;
+  const plotW = W - padL - padR;
+  const groupW = plotW / categories.length;
+  const barW = (groupW - groupGap - barGap * (series.length - 1)) / series.length;
+  const maxV = Math.max(...series.flatMap((s) => s.values));
+  const H = 200;
+  const plotH = H - padT - padB;
+  const scaleH = (v: number) => (v / maxV) * plotH;
+
+  return (
+    <figure className="chart-fig">
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Gráfico de barras agrupadas">
+        <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="var(--ink)" />
+        {categories.map((cat, ci) => {
+          const groupX = padL + ci * groupW + groupGap / 2;
+          return (
+            <g key={cat}>
+              {series.map((s, si) => {
+                const h = scaleH(s.values[ci]);
+                const x = groupX + si * (barW + barGap);
+                return (
+                  <rect
+                    key={s.label}
+                    x={x}
+                    y={H - padB - h}
+                    width={barW}
+                    height={h}
+                    fill={si === 0 ? "var(--ink)" : "#fff"}
+                    stroke="var(--ink)"
+                  />
+                );
+              })}
+              <text x={groupX + (groupW - groupGap) / 2} y={H - padB + 14} textAnchor="middle" fontSize="9.5" fill="var(--ink)">
+                {cat}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="line-legend">
+        {series.map((s, i) => (
+          <span key={s.label} className="line-legend-item">
+            <span className={`line-swatch block ${i === 0 ? "filled" : ""}`} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </figure>
+  );
+}
+
 export default function App() {
   const [, setActive] = useState<SectionId>("s1");
   const refs = useRef<Partial<Record<SectionId, HTMLElement | null>>>({});
@@ -1636,6 +1773,34 @@ export default function App() {
           margin-top: 8px;
           text-align: center;
         }
+        .line-legend {
+          display: flex;
+          justify-content: center;
+          gap: 18px;
+          margin-top: 10px;
+          flex-wrap: wrap;
+        }
+        .line-legend-item {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          color: var(--ink);
+        }
+        .line-swatch {
+          display: inline-block;
+          width: 18px;
+          height: 0;
+          border-top: 1.5px solid var(--ink);
+        }
+        .line-swatch.dashed { border-top-style: dashed; }
+        .line-swatch.block {
+          width: 11px;
+          height: 11px;
+          border: 1px solid var(--ink);
+          border-top: 1px solid var(--ink);
+        }
+        .line-swatch.block.filled { background: var(--ink); }
 
         .bar-viz {
           display: grid;
@@ -2265,6 +2430,14 @@ export default function App() {
                 <tr><td>Gênero</td><td>275</td><td>310</td><td>260</td></tr>
               </tbody>
             </table>
+            <GroupedBarChart
+              categories={["Filo", "Classe", "Ordem", "Família", "Gênero"]}
+              series={[
+                { label: "DESeq2", values: [23, 48, 119, 176, 275] },
+                { label: "ANCOM-BC2", values: [22, 49, 124, 198, 310] },
+                { label: "ALDEx2", values: [22, 41, 98, 166, 260] },
+              ]}
+            />
             <div className="table-caption-below">
               O número de táxons significativos cresce do filo pro gênero —
               esperado, já que existem muito mais gêneros distintos do que
@@ -2378,6 +2551,15 @@ export default function App() {
                 <tr><td><strong>Gênero</strong></td><td><strong>0,937 ± 0,023</strong></td><td><strong>0,937 ± 0,023</strong></td><td><strong>0,963 ± 0,024</strong></td><td><strong>0,979 ± 0,010</strong></td></tr>
               </tbody>
             </table>
+            <LineChart
+              categories={["Filo", "Classe", "Ordem", "Família", "Gênero"]}
+              series={[
+                { label: "Acurácia", values: [0.904, 0.908, 0.916, 0.934, 0.937] },
+                { label: "AUC", values: [0.956, 0.966, 0.971, 0.980, 0.979], dashed: true },
+              ]}
+              yMin={0.85}
+              yMax={1.0}
+            />
             <p>
               Igual ao artigo original, o nível de <strong>gênero</strong>{" "}
               teve o melhor desempenho — e, mais importante, bateu de perto
@@ -2497,6 +2679,13 @@ export default function App() {
                 <tr><td>Critério de seleção</td><td>Controle + seca pré-florescimento, semanas 2–7 e 10–17</td></tr>
               </tbody>
             </table>
+            <BarChart
+              data={[
+                { label: "Raiz", value: 160 },
+                { label: "Solo", value: 150 },
+                { label: "Rizosfera", value: 139 },
+              ]}
+            />
             <div className="callout">
               <div className="callout-label">transparência sobre o critério</div>
               <p>
@@ -2586,7 +2775,7 @@ export default function App() {
         </main>
       </div>
 
-      <footer className="pagefoot">—PPGTCA / UTFPR —</footer>
+      <footer className="pagefoot">— caderno vivo · PPGTCA / UTFPR —</footer>
     </div>
   );
 }
