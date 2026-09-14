@@ -1986,7 +1986,7 @@ export default function App() {
             <div className="doc-note">caderno de acompanhamento — atualizado conforme o trabalho avança</div>
             <div className="quick-links">
               <a
-                href="https://drive.google.com/drive/folders/SUBSTITUA-PELO-ID-DA-PASTA"
+                href="https://drive.google.com/drive/folders/1P6-fQb7lEphguY-HU1m537JFc2OMg76R?usp=sharing"
                 target="_blank"
                 rel="noreferrer"
                 className="quick-link"
