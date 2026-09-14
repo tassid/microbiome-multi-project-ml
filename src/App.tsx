@@ -1654,6 +1654,23 @@ export default function App() {
         .doc-authors { font-size: 14.5px; margin-bottom: 4px; }
         .doc-affil { font-size: 12.5px; color: var(--ink-soft); font-style: italic; }
         .doc-note { font-size: 12px; color: var(--ink-soft); margin-top: 10px; }
+        .quick-links {
+          display: flex;
+          justify-content: center;
+          gap: 14px;
+          margin-top: 16px;
+          flex-wrap: wrap;
+        }
+        .quick-link {
+          font-family: var(--font-serif);
+          font-size: 13px;
+          color: var(--ink);
+          text-decoration: none;
+          border: 1px solid var(--rule-light);
+          border-radius: 20px;
+          padding: 6px 16px;
+        }
+        .quick-link:hover { border-color: var(--ink); background: var(--rule-light); }
 
         .abstract { max-width: 42em; margin: 0 auto 44px; padding: 0 20px; }
         .abstract-heading { text-align: center; font-weight: 700; font-size: 13.5px; margin-bottom: 10px; }
@@ -1967,6 +1984,19 @@ export default function App() {
               PPGTCA — Universidade Tecnológica Federal do Paraná
             </div>
             <div className="doc-note">caderno de acompanhamento — atualizado conforme o trabalho avança</div>
+            <div className="quick-links">
+              <a
+                href="https://drive.google.com/drive/folders/SUBSTITUA-PELO-ID-DA-PASTA"
+                target="_blank"
+                rel="noreferrer"
+                className="quick-link"
+              >
+                📁 Todos os arquivos (Drive)
+              </a>
+              <a href="./apresentacao.html" target="_blank" rel="noreferrer" className="quick-link">
+                🎞️ Apresentação de slides
+              </a>
+            </div>
           </div>
 
           <div className="abstract">
