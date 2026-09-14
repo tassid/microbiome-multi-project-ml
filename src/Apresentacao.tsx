@@ -92,6 +92,15 @@ function Bullets({ items }: { items: React.ReactNode[] }) {
   );
 }
 
+function Concept({ term, children }: { term: string; children: React.ReactNode }) {
+  return (
+    <div className="concept-box">
+      <div className="concept-box-term">O que é {term}?</div>
+      <div className="concept-box-text">{children}</div>
+    </div>
+  );
+}
+
 interface Slide {
   content: React.ReactNode;
   variant?: "title" | "section" | "default";
@@ -147,6 +156,11 @@ const slides: Slide[] = [
       <>
         <Kicker>1 · Contexto</Kicker>
         <h2>Objeto da dissertação</h2>
+        <Concept term="microbioma">
+          O conjunto de micro-organismos (principalmente bactérias) que vivem
+          associados a um ambiente — aqui, ao redor e dentro das raízes das
+          plantas.
+        </Concept>
         <Bullets
           items={[
             <>Classificar <strong>sanidade em soja</strong> a partir do microbioma associado à cultura</>,
@@ -200,6 +214,12 @@ const slides: Slide[] = [
             "Interpretação via SHAP: quais bactérias pesam mais na decisão do modelo",
           ]}
         />
+        <Concept term="16S rRNA, Random Forest e SHAP">
+          16S rRNA é o gene usado para "ler" quais bactérias existem numa
+          amostra. Random Forest é um modelo de IA que combina várias
+          "árvores de decisão" simples pra classificar. SHAP explica,
+          depois, o que pesou na decisão de cada árvore.
+        </Concept>
       </>
     ),
   },
@@ -289,6 +309,13 @@ const slides: Slide[] = [
       <>
         <Kicker>5 · Processamento</Kicker>
         <h2>Remoção de primers e DADA2</h2>
+        <Concept term="ASV e DADA2">
+          ASV é uma sequência de DNA identificada com precisão de
+          nucleotídeo — cada uma representa uma "bactéria" distinta
+          encontrada na amostra. DADA2 é o algoritmo que transforma as
+          leituras brutas do sequenciador nessa tabela de ASVs, corrigindo
+          erros de leitura.
+        </Concept>
         <Bullets
           items={[
             "Primers 341F/785R (região V3–V4 do 16S), removidos via cutadapt — 98,4% das leituras aproveitadas",
@@ -319,6 +346,12 @@ const slides: Slide[] = [
             { label: "Actinomycetota", value: 3281 },
           ]}
         />
+        <Concept term="taxonomia e SILVA">
+          Taxonomia é o "nome científico" de cada bactéria — de que família,
+          gênero ou espécie ela é. SILVA é o banco de dados de referência
+          com milhares de sequências já identificadas, usado como
+          dicionário pra dar esse nome a cada ASV.
+        </Concept>
       </>
     ),
   },
@@ -338,6 +371,12 @@ const slides: Slide[] = [
       <>
         <Kicker>6 · Diversidade</Kicker>
         <h2>Diversidade alfa vs. beta</h2>
+        <Concept term="diversidade alfa e beta">
+          Alfa mede o quão diversa é a comunidade <em>dentro</em> de uma
+          amostra (índice de Shannon). Beta mede o quanto duas amostras{" "}
+          <em>diferem entre si</em> em composição (Bray-Curtis), testado
+          estatisticamente via PERMANOVA.
+        </Concept>
         <div className="two-col">
           <div className="stat-card">
             <div className="stat-label">Shannon (alfa)</div>
@@ -363,6 +402,12 @@ const slides: Slide[] = [
       <>
         <Kicker>6 · DAA</Kicker>
         <h2>5 métodos de Análise de Abundância Diferencial</h2>
+        <Concept term="Análise de Abundância Diferencial (DAA)">
+          Testes estatísticos que descobrem quais bactérias específicas
+          mudam de quantidade entre os grupos (Controle vs. Seca). Usar 5
+          métodos diferentes, em vez de um só, ajuda a confiar mais no
+          resultado quando todos concordam.
+        </Concept>
         <MiniBar
           data={[
             { label: "edgeR", value: 2498 },
@@ -385,6 +430,12 @@ const slides: Slide[] = [
       <>
         <Kicker>6 · DAA</Kicker>
         <h2>Estendendo aos 5 níveis taxonômicos</h2>
+        <Concept term="níveis taxonômicos (filo a gênero)">
+          A taxonomia é hierárquica, como uma árvore genealógica: filo é um
+          grupo bem amplo de bactérias, gênero é bem específico. Repetir a
+          análise em cada nível mostra em que "resolução" o sinal
+          biológico aparece com mais força.
+        </Concept>
         <p className="lede small">3 métodos mais consistentes: DESeq2, ANCOM-BC2, ALDEx2</p>
         <MiniLine
           categories={["Filo", "Classe", "Ordem", "Família", "Gênero"]}
@@ -415,6 +466,12 @@ const slides: Slide[] = [
       <>
         <Kicker>7 · Viés</Kicker>
         <h2>As amostras se agrupam pelo motivo certo?</h2>
+        <Concept term="t-SNE">
+          Técnica que pega dados com milhares de "dimensões" (uma por
+          bactéria) e os achata num mapa 2D fácil de olhar — amostras
+          parecidas ficam pertinho, diferentes ficam longe. Serve pra
+          enxergar visualmente se existem grupos escondidos nos dados.
+        </Concept>
         <Bullets
           items={[
             "t-SNE geral: compartimento (solo/raiz/rizosfera) domina a projeção — não regime de rega",
@@ -465,6 +522,12 @@ const slides: Slide[] = [
       <>
         <Kicker>8 · ML</Kicker>
         <h2>Random Forest com validação cruzada aninhada</h2>
+        <Concept term="validação cruzada aninhada (Nested CV)">
+          Um jeito cuidadoso de testar o modelo: um laço externo avalia o
+          desempenho, um laço interno ajusta os parâmetros — em camadas
+          separadas, pra garantir que o modelo não "colou" nos dados de
+          teste.
+        </Concept>
         <Bullets
           items={[
             "Testado nos 5 níveis taxonômicos (filo a gênero)",
@@ -481,6 +544,12 @@ const slides: Slide[] = [
       <>
         <Kicker>8 · ML</Kicker>
         <h2>Desempenho por nível taxonômico</h2>
+        <Concept term="acurácia e AUC">
+          Acurácia é a proporção de acertos do modelo. AUC resume o quão
+          bem ele separa os dois grupos em todos os limiares de decisão
+          possíveis — varia de 0,5 (chute aleatório) a 1,0 (separação
+          perfeita).
+        </Concept>
         <MiniLine
           categories={["Filo", "Classe", "Ordem", "Família", "Gênero"]}
           series={[
@@ -810,6 +879,33 @@ export default function Apresentacao() {
           box-shadow: none;
           border: 1px solid rgba(253,236,197,0.25);
         }
+        .concept-box {
+          border-left: 3px solid var(--gold-deep);
+          background: rgba(242,182,50,0.08);
+          border-radius: 0 8px 8px 0;
+          padding: 8px 16px;
+          max-width: 58ch;
+          margin: 4px 0 14px;
+        }
+        .section-slide .concept-box {
+          border-left-color: var(--gold);
+          background: rgba(253,236,197,0.06);
+        }
+        .concept-box-term {
+          font-size: 11.5px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--gold-deep);
+          margin-bottom: 3px;
+        }
+        .section-slide .concept-box-term { color: var(--gold); }
+        .concept-box-text {
+          font-size: clamp(12.5px, 1.15vw, 15px);
+          color: var(--ink-soft);
+          line-height: 1.45;
+        }
+        .section-slide .concept-box-text { color: #d8c99a; }
         .card-block-head {
           background: var(--gold);
           color: #2a1f04;
