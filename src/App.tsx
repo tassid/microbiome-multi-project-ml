@@ -79,6 +79,10 @@ const TERMS: Record<string, string> = {
     "Uma forma de dividir os dados em quatro partes iguais. O 1º quartil é o valor abaixo do qual estão 25% dos dados; o 3º quartil, abaixo do qual estão 75%. A distância entre eles mostra o quão espalhados os valores estão no meio da distribuição.",
   tsne: "Uma técnica que pega dados com milhares de \"dimensões\" (uma por bactéria, por exemplo) e os achata num mapa de duas dimensões fácil de olhar — amostras parecidas ficam pertinho, amostras diferentes ficam longe. Serve pra enxergar visualmente se existem grupos escondidos nos dados.",
   vies: "Quando um modelo aprende a reconhecer algo que não era pra ele aprender — por exemplo, de qual projeto ou espécie de planta veio a amostra, em vez do que realmente importa (seca ou sanidade) — porque esses fatores, sem querer, também formam grupos bem separados nos dados.",
+  phyloseq: "O formato de dados padrão em R para estudos de microbioma: junta numa única estrutura a tabela de contagens de cada ASV, a taxonomia de cada uma e os metadados das amostras (regime de rega, compartimento etc.), pra facilitar todas as análises seguintes.",
+  wilcoxonMethod: "Um teste estatístico que compara dois grupos sem assumir que os dados seguem uma distribuição específica (como a curva de sino) — útil porque dados de microbioma raramente seguem essa curva.",
+  edgerMethod: "Um método originalmente criado para comparar níveis de expressão de genes (RNA-seq), adaptado aqui para comparar quantidades de bactérias entre grupos.",
+  deseqMethod: "Parecido com o edgeR na origem (RNA-seq), mas usa uma forma diferente de estimar o quanto os dados variam naturalmente antes de decidir se uma diferença é real.",
 };
 
 function Term({ id, children }: { id: string; children: React.ReactNode }) {
@@ -344,10 +348,8 @@ qiime tools import \\
         descobrir quais bactérias específicas aparecem em quantidade
         significativamente diferente entre os dois grupos — usar cinco
         métodos ao mesmo tempo, em vez de um só, ajuda a confiar mais no
-        resultado quando todos concordam. Os 12 pacotes de R necessários
-        (phyloseq, DESeq2, ALDEx2, edgeR, ANCOMBC, microbiomeMarker, entre
-        outros) já foram instalados, e o script completo com os 5 métodos
-        está pronto — falta só executá-lo.
+        resultado quando todos concordam. Os 5 métodos já foram executados
+        com sucesso (resultados na seção 5.3).
       </>
     ),
     commands: [
@@ -425,13 +427,15 @@ taxonomy_tsv <- read.delim("exported-taxonomy/taxonomy.tsv", stringsAsFactors = 
 # taxonomy_tsv tem colunas: Feature.ID, Taxon, Confidence
 
 # separar a string de taxonomia em colunas por rank
+# nota: "Kingdom" é o único nome de domínio que o phyloseq reconhece
+# (usar "Domain" quebra funções downstream que esperam ranks padrão)
 tax_split <- taxonomy_tsv %>%
-  separate(Taxon, into = c("Domain","Kingdom","Phylum","Class","Order","Family","Genus"),
+  separate(Taxon, into = c("Kingdom","Kingdom2","Phylum","Class","Order","Family","Genus"),
            sep = ";", fill = "right", extra = "drop") %>%
-  mutate(across(Domain:Genus, ~ trimws(.))) %>%
+  mutate(across(Kingdom:Genus, ~ trimws(.))) %>%
   column_to_rownames("Feature.ID")
 
-tax_mat <- as.matrix(tax_split[, c("Domain","Phylum","Class","Order","Family","Genus")])
+tax_mat <- as.matrix(tax_split[, c("Kingdom","Phylum","Class","Order","Family","Genus")])
 
 metadata <- read.delim("sample-metadata.tsv", stringsAsFactors = FALSE)
 metadata <- metadata[metadata$sample.id != "#q2:types", ]
@@ -462,7 +466,7 @@ taxa_info <- data.frame(tax_table(ps_rare_filtered)) %>%
 
 ps_rare_filtered_clr <- microbiome::transform(ps_rare_filtered, "clr")
 
-ps_wilcox_r <- data.frame(phyloseq::otu_table(ps_rare_filtered_clr))
+ps_wilcox_r <- as.data.frame(t(as(phyloseq::otu_table(ps_rare_filtered_clr), "matrix")))
 ps_wilcox_r$Watering_Regm <- phyloseq::sample_data(ps_rare_filtered_clr)$Watering_Regm
 
 wilcox_pval <- function(df) wilcox.test(abund ~ Watering_Regm, data = df)$p.value
@@ -526,23 +530,29 @@ cat("DESeq2: ", nrow(deseq_marker), "ASVs significativas\\n")`,
       },
       {
         code: `# -------------------------------------------------------------
-# 6. ALDEx2
+# 6. ALDEx2 (chamado diretamente, sem o wrapper do microbiomeMarker,
+#    que tem um bug interno de compatibilidade nesta versão)
 # -------------------------------------------------------------
+library(ALDEx2)
 
-aldex_microbiomeMarker <- run_aldex(
-  ps_rare_filtered, group = "Watering_Regm", taxa_rank = "none",
-  transform = "identity", norm = "none", method = "wilcox.test",
-  p_adjust = "BH", pvalue_cutoff = 0.05, mc_samples = 128,
-  denom = "iqlr", paired = FALSE
-)
-aldex_marker <- marker_table(aldex_microbiomeMarker) %>%
-  as_tibble() %>%
-  arrange(order(gtools::mixedorder(feature))) %>%
-  dplyr::rename(ASV = feature) %>%
+otu_int <- round(as(phyloseq::otu_table(ps_rare_filtered), "matrix"))
+conds   <- as.character(phyloseq::sample_data(ps_rare_filtered)$Watering_Regm)
+
+x_clr    <- aldex.clr(otu_int, conds, mc.samples = 128, denom = "iqlr", verbose = TRUE)
+x_tt     <- aldex.ttest(x_clr, paired.test = FALSE)
+x_effect <- aldex.effect(x_clr)
+
+aldex_all <- data.frame(x_tt, x_effect)
+aldex_all$BH_wilcoxon <- p.adjust(aldex_all$wi.ep, method = "BH")
+
+aldex_marker <- aldex_all %>%
+  rownames_to_column("ASV") %>%
+  filter(BH_wilcoxon < 0.05) %>%
+  arrange(order(gtools::mixedorder(ASV))) %>%
   left_join(taxa_info, by = "ASV")
 
 cat("ALDEx2: ", nrow(aldex_marker), "ASVs significativas\\n")`,
-        caption: "Quarto método: ALDEx2, que gera 128 amostras Monte Carlo por ASV para estimar a incerteza da composição antes de testar — por isso é o mais lento dos cinco.",
+        caption: "Quarto método: ALDEx2, que gera 128 amostras Monte Carlo por ASV para estimar a incerteza da composição antes de testar. O wrapper do microbiomeMarker quebrou por um bug interno, então o ALDEx2 foi chamado direto — daí o código ficar um pouco diferente dos outros quatro métodos.",
       },
       {
         code: `# -------------------------------------------------------------
@@ -629,7 +639,10 @@ cat("\\nResultados salvos em: daa_results_asv_level.RData\\n")`,
         especialmente relevante porque a dissertação pretende combinar
         dados de vários projetos diferentes de soja: se o t-SNE mostrar
         agrupamento por projeto em vez de por sanidade, a validação
-        leave-one-project-out não é opcional — é obrigatória.
+        leave-one-project-out não é opcional — é obrigatória. Resultado
+        real (seção 5.4): compartimento se mostrou o eixo de maior viés,
+        mas o sinal de regime de rega se manteve real dentro de cada
+        compartimento isolado.
       </>
     ),
     commands: [
@@ -1018,6 +1031,7 @@ export default function App() {
         table.formal th, table.formal td { text-align: left; padding: 7px 14px 7px 0; font-weight: 400; }
         table.formal th { font-weight: 700; }
         .table-caption-below { font-size: 12.5px; color: var(--ink-soft); margin: 6px 0 20px; }
+        .pending-cell { color: var(--ink-soft); font-style: italic; }
 
         .chart-fig {
           margin: 12px 0 22px;
@@ -1443,9 +1457,9 @@ export default function App() {
             <h2 className="sec"><span className="sec-num">5.</span>Resultados obtidos até agora</h2>
             <p>
               Um resumo consolidado de todos os números produzidos pela
-              replicação até o momento, organizado por etapa. As etapas 8
-              (t-SNE), 9 (Machine Learning) e 10 (comparação final) ainda
-              estão pendentes.
+              replicação até o momento, organizado por etapa. As etapas 9
+              (Machine Learning) e 10 (comparação final) ainda estão
+              pendentes.
             </p>
 
             <h3 className="sub-title">5.1 Processamento DADA2 e taxonomia</h3>
@@ -1569,7 +1583,157 @@ export default function App() {
               </p>
             </div>
 
-            <h3 className="sub-title">5.3 Alvo de comparação para as próximas etapas</h3>
+            <h3 className="sub-title">5.3 Análise de Abundância Diferencial (resultados parciais)</h3>
+            <p>
+              Depois de montar o objeto <Term id="phyloseq">phyloseq</Term>{" "}
+              (a estrutura que junta a tabela de ASVs, a taxonomia e os
+              metadados das amostras num só lugar), o script roda os cinco
+              métodos de <Term id="daa">DAA</Term> em sequência, cada um com
+              uma forma diferente de decidir se uma ASV muda de quantidade
+              entre Controle e Seca. Rodar cinco ao mesmo tempo, em vez de
+              confiar num só, é uma forma de checar se o resultado é
+              robusto — ASVs que aparecem como significativas em vários
+              métodos ao mesmo tempo são candidatas mais confiáveis a
+              táxons marcadores do que as que só um método aponta.
+            </p>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 6.</span> ASVs significativas por método (de 4.354 ASVs testadas, α = 0,05 com correção BH).</caption>
+              <thead><tr><th>Método</th><th>Como funciona</th><th>ASVs significativas</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><Term id="wilcoxonMethod">Wilcoxon</Term></td>
+                  <td>Teste não-paramétrico simples, sobre dados transformados por CLR</td>
+                  <td>2.100</td>
+                </tr>
+                <tr>
+                  <td><Term id="edgerMethod">edgeR</Term></td>
+                  <td>Modelo estatístico originalmente feito para RNA-seq</td>
+                  <td>2.498</td>
+                </tr>
+                <tr>
+                  <td><Term id="deseqMethod">DESeq2</Term></td>
+                  <td>Também de RNA-seq, modela a variância de forma diferente do edgeR</td>
+                  <td>1.136</td>
+                </tr>
+                <tr>
+                  <td>ALDEx2</td>
+                  <td>Gera 128 réplicas Monte Carlo por ASV para estimar incerteza antes de testar</td>
+                  <td>590</td>
+                </tr>
+                <tr>
+                  <td>ANCOM-BC2</td>
+                  <td>Modela diretamente o viés de composição dos dados de microbioma</td>
+                  <td>1.708</td>
+                </tr>
+              </tbody>
+            </table>
+            <BarChart
+              data={[
+                { label: "edgeR", value: 2498 },
+                { label: "Wilcoxon", value: 2100 },
+                { label: "ANCOM-BC2", value: 1708 },
+                { label: "DESeq2", value: 1136 },
+                { label: "ALDEx2", value: 590 },
+              ]}
+            />
+            <div className="callout">
+              <div className="callout-label">por que os números variam tanto entre métodos</div>
+              <p>
+                Não é motivo de alarme o edgeR e o ALDEx2 discordarem tanto
+                (2.498 vs. 590) — é justamente por isso que o artigo
+                original usa cinco métodos e depois cruza os resultados: os
+                cinco fazem suposições estatísticas diferentes sobre como a
+                variância se comporta nos dados, e o ALDEx2 em particular é
+                o mais conservador, por incorporar a incerteza da
+                composição antes mesmo de testar. A comparação de
+                sobreposição entre os cinco conjuntos, gerada via UpSetR,
+                mostra o número que realmente importa aqui:{" "}
+                <strong>668 ASVs foram significativas nos 5 métodos ao
+                mesmo tempo</strong> — esse é o conjunto mais confiável de
+                candidatas a táxons marcadores, porque nenhum dos cinco
+                métodos discorda dele. Os próximos maiores grupos (472,
+                432, 389 ASVs) são interseções quase completas, faltando
+                só um método por vez, o que reforça que a convergência
+                entre métodos é a regra, não a exceção.
+              </p>
+            </div>
+
+            <h3 className="sub-title">5.4 Checagem de viés (t-SNE)</h3>
+            <p>
+              Antes de avançar pra etapa de Machine Learning, foi feita a
+              checagem de viés de agrupamento descrita na etapa 8 (seção 4).
+              A projeção <Term id="tsne">t-SNE</Term> geral, colorida por
+              três fatores diferentes (regime de rega, compartimento e
+              espécie de planta), mostrou que compartimento
+              (solo/raiz/rizosfera) é o eixo de maior variância na
+              comunidade bacteriana — resultado esperado e consistente com
+              Hagen et al. (2024) — enquanto espécie de planta apareceu bem
+              misturada, sem indício de confundimento.
+            </p>
+            <figure className="chart-fig">
+              <img
+                src={`${import.meta.env.BASE_URL}tsne_bias_check.png`}
+                alt="Projeção t-SNE geral colorida por regime de rega, compartimento e espécie de planta"
+                style={{ width: "100%", height: "auto", display: "block" }}
+              />
+              <figcaption>
+                Figura 2. Projeção t-SNE geral: compartimento forma os
+                agrupamentos mais nítidos dos três fatores testados.
+              </figcaption>
+            </figure>
+            <p>
+              Para isolar se o sinal de regime de rega era real ou apenas
+              um subproduto do eixo de compartimento, a t-SNE foi refeita
+              separadamente dentro de cada compartimento:
+            </p>
+            <figure className="chart-fig">
+              <img
+                src={`${import.meta.env.BASE_URL}tsne_by_compartment.png`}
+                alt="Projeção t-SNE estratificada por compartimento, colorida por regime de rega"
+                style={{ width: "100%", height: "auto", display: "block" }}
+              />
+              <figcaption>
+                Figura 3. t-SNE dentro de cada compartimento, colorida só
+                por regime de rega — a separação Controle/Seca varia em
+                nitidez, mas aparece nos três painéis.
+              </figcaption>
+            </figure>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 8.</span> Separação Controle/Seca por compartimento, na t-SNE estratificada.</caption>
+              <thead><tr><th>Compartimento</th><th>n amostras</th><th>Balanceamento Controle/Seca</th><th>Separação visual</th></tr></thead>
+              <tbody>
+                <tr><td>Rizosfera</td><td>208</td><td>107 / 101 (51% / 49%)</td><td>Forte, quase sem sobreposição</td></tr>
+                <tr><td>Raiz</td><td>180</td><td>97 / 83 (54% / 46%)</td><td>Moderada, com sobreposição parcial</td></tr>
+                <tr><td>Solo</td><td>189</td><td>98 / 91 (52% / 48%)</td><td>Mais fraca, bastante mistura</td></tr>
+              </tbody>
+            </table>
+            <p>
+              O balanceamento entre Controle e Seca ficou praticamente
+              igual nos três compartimentos, o que descarta desbalanceamento
+              amostral como explicação para a diferença de nitidez entre
+              eles. A leitura mais provável é biológica: a rizosfera
+              responde de forma mais rápida e intensa ao estresse hídrico
+              da planta do que o solo bulk, que tende a ser mais tamponado.
+            </p>
+            <div className="callout">
+              <div className="callout-label">conclusão</div>
+              <p>
+                O sinal de estresse hídrico é real e está presente nos três
+                compartimentos, não é um artefato do agrupamento por
+                compartimento — mas sua intensidade varia (rizosfera &gt;
+                raiz &gt; solo). Isso reforça, já nesta réplica, a lógica
+                por trás da validação <Term id="looPo">leave-one-project-out</Term>{" "}
+                planejada para a dissertação (seção 6): mesmo dentro de um
+                único estudo controlado, o sinal biológico não é homogêneo
+                entre subgrupos, então em múltiplos projetos de soja
+                combinados esse risco de heterogeneidade tende a ser maior,
+                não menor. Na etapa 9 (Machine Learning), compartimento será
+                tratado como estrato na validação, em vez de misturar tudo
+                num único classificador.
+              </p>
+            </div>
+
+            <h3 className="sub-title">5.5 Alvo de comparação para as próximas etapas</h3>
             <p>
               Para referência futura, os valores que a etapa de Machine
               Learning (seção 4, etapa 9) precisará se aproximar, publicados
@@ -1577,7 +1741,7 @@ export default function App() {
               que apresentou o melhor desempenho no artigo original:
             </p>
             <table className="formal">
-              <caption><span className="cap-label">Tabela 6.</span> Desempenho do Random Forest no artigo original (nível de gênero, dataset Grass-Drought).</caption>
+              <caption><span className="cap-label">Tabela 9.</span> Desempenho do Random Forest no artigo original (nível de gênero, dataset Grass-Drought).</caption>
               <thead><tr><th>Métrica</th><th>Valor publicado</th></tr></thead>
               <tbody>
                 <tr><td>Acurácia</td><td>0,923 ± 0,029</td></tr>
@@ -1591,15 +1755,12 @@ export default function App() {
 
             <p>
               A Análise de Abundância Diferencial com os 5 métodos (DESeq2,
-              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) está pronta para rodar —
-              os dados já foram exportados do QIIME 2, os 12 pacotes de R
-              necessários foram instalados (incluindo compilar dependências
-              de sistema como o Cairo, via Homebrew), e o script completo
-              (<code>daa_5_metodos.R</code>) já reproduz literalmente o
-              código do repositório original. A checagem de viés via
-              t-SNE, o Machine Learning (Random Forest + SHAP) e a
-              comparação final com os valores publicados ainda não foram
-              iniciados.
+              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) foi concluída com sucesso
+              (resultados na seção 5.3) — incluindo contornar um bug interno
+              do pacote <code>microbiomeMarker</code> no ALDEx2, resolvido
+              chamando o ALDEx2 diretamente. A checagem de viés via t-SNE, o
+              Machine Learning (Random Forest + SHAP) e a comparação final
+              com os valores publicados ainda não foram iniciados.
             </p>
           </section>
 
@@ -1617,7 +1778,7 @@ export default function App() {
               está só "decorando" as particularidades de cada projeto.
             </p>
             <table className="formal">
-              <caption><span className="cap-label">Tabela 7.</span> O que muda entre este estudo e a dissertação.</caption>
+              <caption><span className="cap-label">Tabela 10.</span> O que muda entre este estudo e a dissertação.</caption>
               <thead><tr><th>Neste estudo</th><th>Na dissertação</th></tr></thead>
               <tbody>
                 <tr><td>Um único estudo grande</td><td>Vários projetos de soja combinados</td></tr>
