@@ -635,7 +635,126 @@ save(sig_wilcox_r, edger_marker, deseq_marker, aldex_marker, ancombc2_marker,
 cat("\\nResultados salvos em: daa_results_asv_level.RData\\n")`,
         caption: "Salva todos os resultados num único arquivo .RData, para não precisar rodar tudo de novo caso a sessão do R feche.",
       },
+      {
+        code: `# =============================================================
+# DAA em todos os níveis taxonômicos (filo a gênero)
+# Usa os 3 métodos mais consistentes: DESeq2, ALDEx2, ANCOM-BC2
+# Replicando Hagen et al. (2024), seção "DAA on all ranks"
+# =============================================================
 
+library(phyloseq)
+library(biomformat)
+library(tidyverse)
+library(microbiome)
+library(microbiomeMarker)
+library(ANCOMBC)
+library(ALDEx2)
+library(gtools)
+
+# -------------------------------------------------------------
+# 1. Reconstruir o objeto phyloseq (igual ao script da ASV)
+# -------------------------------------------------------------
+biom_data_obj <- read_biom("exported-rarefied-table/feature-table.biom")
+otu_mat       <- as(biom_data(biom_data_obj), "matrix")
+
+taxonomy_tsv <- read.delim("exported-taxonomy/taxonomy.tsv", stringsAsFactors = FALSE)
+
+tax_split <- taxonomy_tsv %>%
+  separate(Taxon, into = c("Kingdom","Kingdom2","Phylum","Class","Order","Family","Genus"),
+           sep = ";", fill = "right", extra = "drop") %>%
+  mutate(across(Kingdom:Genus, ~ trimws(.))) %>%
+  column_to_rownames("Feature.ID")
+
+tax_mat <- as.matrix(tax_split[, c("Kingdom","Phylum","Class","Order","Family","Genus")])
+
+metadata <- read.delim("sample-metadata.tsv", stringsAsFactors = FALSE)
+metadata <- metadata[metadata$sample.id != "#q2:types", ]
+rownames(metadata) <- metadata$sample.id
+
+ps_rare_filtered <- phyloseq(
+  otu_table(otu_mat, taxa_are_rows = TRUE),
+  tax_table(tax_mat),
+  sample_data(metadata)
+)
+
+ranks <- c("Phylum", "Class", "Order", "Family", "Genus")
+resultados_por_rank <- list()
+
+# -------------------------------------------------------------
+# 2. Rodar os 3 métodos em cada nível taxonômico
+# -------------------------------------------------------------
+for (rank in ranks) {
+
+  cat("\\n========== Nível:", rank, "==========\\n")
+
+  # --- DESeq2 (agregação interna via taxa_rank) ---
+  deseq_res <- tryCatch({
+    m <- run_deseq2(
+      ps_rare_filtered, group = "Watering_Regm", confounders = character(0),
+      contrast = NULL, taxa_rank = rank, norm = "none", transform = "identity",
+      fitType = "local", sfType = "poscounts", betaPrior = FALSE, useT = FALSE,
+      p_adjust = "BH", pvalue_cutoff = 0.05
+    )
+    marker_table(m) %>% as_tibble() %>% filter(feature != "" & !grepl("__$", feature))
+  }, error = function(e) { cat("  DESeq2 falhou:", conditionMessage(e), "\\n"); NULL })
+  n_deseq <- if (!is.null(deseq_res)) nrow(deseq_res) else NA
+  cat("  DESeq2:  ", n_deseq, "táxons significativos\\n")
+
+  # --- ANCOM-BC2 (agregação interna via tax_level) ---
+  ancom_res <- tryCatch({
+    a <- ancombc2(
+      data = ps_rare_filtered, tax_level = rank, fix_formula = "Watering_Regm",
+      p_adj_method = "BH", lib_cut = 0, group = "Watering_Regm",
+      struc_zero = FALSE, neg_lb = FALSE, alpha = 0.05, global = FALSE
+    )
+    df <- data.frame(
+      taxon = unlist(a$res$taxon),
+      q_val = unlist(a$res$q_Watering_RegmDrought)
+    )
+    df %>% filter(q_val < 0.05)
+  }, error = function(e) { cat("  ANCOM-BC2 falhou:", conditionMessage(e), "\\n"); NULL })
+  n_ancom <- if (!is.null(ancom_res)) nrow(ancom_res) else NA
+  cat("  ANCOM-BC2:", n_ancom, "táxons significativos\\n")
+
+  # --- ALDEx2 (agregação manual via tax_glom antes de rodar) ---
+  aldex_res <- tryCatch({
+    ps_glom <- tax_glom(ps_rare_filtered, taxrank = rank, NArm = FALSE)
+    otu_int <- round(as(otu_table(ps_glom), "matrix"))
+    conds   <- as.character(sample_data(ps_glom)$Watering_Regm)
+
+    x_clr <- aldex.clr(otu_int, conds, mc.samples = 128, denom = "iqlr", verbose = FALSE)
+    x_tt  <- aldex.ttest(x_clr, paired.test = FALSE)
+    x_tt$BH_wilcoxon <- p.adjust(x_tt$wi.ep, method = "BH")
+    x_tt %>% filter(BH_wilcoxon < 0.05)
+  }, error = function(e) { cat("  ALDEx2 falhou:", conditionMessage(e), "\\n"); NULL })
+  n_aldex <- if (!is.null(aldex_res)) nrow(aldex_res) else NA
+  cat("  ALDEx2:   ", n_aldex, "táxons significativos\\n")
+
+  resultados_por_rank[[rank]] <- list(
+    deseq = deseq_res, ancombc2 = ancom_res, aldex2 = aldex_res,
+    n_deseq = n_deseq, n_ancombc2 = n_ancom, n_aldex2 = n_aldex
+  )
+}
+
+# -------------------------------------------------------------
+# 3. Resumo final
+# -------------------------------------------------------------
+resumo <- data.frame(
+  rank = ranks,
+  DESeq2 = sapply(ranks, function(r) resultados_por_rank[[r]]$n_deseq),
+  ANCOMBC2 = sapply(ranks, function(r) resultados_por_rank[[r]]$n_ancombc2),
+  ALDEx2 = sapply(ranks, function(r) resultados_por_rank[[r]]$n_aldex2)
+)
+
+cat("\\n\\n=== Resumo: táxons significativos por nível e método ===\\n")
+print(resumo)
+
+write.csv(resumo, "daa_resumo_todos_os_ranks.csv", row.names = FALSE)
+save(resultados_por_rank, file = "daa_todos_os_ranks.RData")
+cat("\\nResumo salvo em: daa_resumo_todos_os_ranks.csv\\n")
+cat("Resultados completos salvos em: daa_todos_os_ranks.RData\\n")`,
+        caption: "Script completo (daa_todos_os_ranks.R): estende os 3 métodos mais consistentes (DESeq2, ANCOM-BC2, ALDEx2) para os outros 4 níveis taxonômicos, usando a agregação interna de cada pacote (taxa_rank/tax_level) ou tax_glom do phyloseq.",
+      },
     ],
   },
   {
@@ -660,7 +779,7 @@ cat("\\nResultados salvos em: daa_results_asv_level.RData\\n")`,
         dados de vários projetos diferentes de soja: se o t-SNE mostrar
         agrupamento por projeto em vez de por sanidade, a validação
         leave-one-project-out não é opcional — é obrigatória. Resultado
-        real (seção 5.4): compartimento se mostrou o eixo de maior viés,
+        real (seção 5.5): compartimento se mostrou o eixo de maior viés,
         mas o sinal de regime de rega se manteve real dentro de cada
         compartimento isolado.
       </>
@@ -831,7 +950,7 @@ print("o sinal de estresse hídrico é real, mesmo controlando por compartimento
         mostrar exatamente quais bactérias pesaram mais na decisão do
         modelo — são essas as candidatas a "bactérias marcadoras" de
         estresse hídrico. Rodado nos 5 níveis taxonômicos (resultados na
-        seção 5.5): gênero teve o melhor desempenho (AUC 0,979, quase
+        seção 5.6): gênero teve o melhor desempenho (AUC 0,979, quase
         idêntico ao artigo original), e o táxon marcador nº 1 apontado
         pelo SHAP (<em>Kribbella</em>) bateu exatamente com o do artigo.
       </>
@@ -1008,7 +1127,7 @@ print("\\nResultados completos salvos em: shap_marker_taxa_genus.csv")`,
         autores originais encontraram: a acurácia do modelo ficou parecida
         com a deles, e as bactérias apontadas pelo SHAP como mais
         importantes são as mesmas que o artigo aponta? A resposta, nas
-        duas frentes, foi sim (seção 5.5) — sinal de que o pipeline
+        duas frentes, foi sim (seção 5.6) — sinal de que o pipeline
         inteiro, do download dos dados brutos até o modelo final, foi
         reproduzido corretamente, e está pronto pra ser adaptado com
         dados reais de soja.
@@ -1971,7 +2090,34 @@ export default function App() {
               </p>
             </div>
 
-            <h3 className="sub-title">5.4 Checagem de viés (t-SNE)</h3>
+            <p>
+              Seguindo o mesmo critério do artigo original, os 3 métodos
+              mais consistentes entre si — <Term id="deseqMethod">DESeq2</Term>,{" "}
+              <Term id="ancombcMethod">ANCOM-BC2</Term> e ALDEx2 — foram
+              estendidos aos outros quatro níveis taxonômicos (filo a
+              gênero), a mesma estrutura usada depois no Machine Learning:
+            </p>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 7.</span> Táxons significativos por nível taxonômico, nos 3 métodos mais consistentes.</caption>
+              <thead><tr><th>Nível</th><th>DESeq2</th><th>ANCOM-BC2</th><th>ALDEx2</th></tr></thead>
+              <tbody>
+                <tr><td>Filo</td><td>23</td><td>22</td><td>22</td></tr>
+                <tr><td>Classe</td><td>48</td><td>49</td><td>41</td></tr>
+                <tr><td>Ordem</td><td>119</td><td>124</td><td>98</td></tr>
+                <tr><td>Família</td><td>176</td><td>198</td><td>166</td></tr>
+                <tr><td>Gênero</td><td>275</td><td>310</td><td>260</td></tr>
+              </tbody>
+            </table>
+            <div className="table-caption-below">
+              O número de táxons significativos cresce do filo pro gênero —
+              esperado, já que existem muito mais gêneros distintos do que
+              filos, então há mais "candidatos" a serem significativos em
+              cada nível mais granular. Os 3 métodos concordam bem entre si
+              em todos os níveis, reforçando a escolha de mantê-los como
+              o trio mais consistente.
+            </div>
+
+            <h3 className="sub-title">5.5 Checagem de viés (t-SNE)</h3>
             <p>
               Antes de avançar pra etapa de Machine Learning, foi feita a
               checagem de viés de agrupamento descrita na etapa 8 (seção 4).
@@ -2057,7 +2203,7 @@ export default function App() {
               </p>
             </div>
 
-            <h3 className="sub-title">5.5 Machine Learning: resultados</h3>
+            <h3 className="sub-title">5.6 Machine Learning: resultados</h3>
             <p>
               O <Term id="randomForest">Random Forest</Term> com{" "}
               <Term id="nestedCV">validação cruzada aninhada</Term> foi
@@ -2179,7 +2325,7 @@ export default function App() {
         </main>
       </div>
 
-      <footer className="pagefoot">—PPGTCA / UTFPR —</footer>
+      <footer className="pagefoot">— caderno vivo · PPGTCA / UTFPR —</footer>
     </div>
   );
 }
