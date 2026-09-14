@@ -77,12 +77,24 @@ const TERMS: Record<string, string> = {
     "Uma forma de deixar todas as amostras \"justas\" entre si: já que cada amostra foi sequenciada com uma profundidade diferente, a rarefação sorteia aleatoriamente o mesmo número de leituras de cada amostra, pra não comparar uma amostra rica em dados com outra pobre.",
   quartil:
     "Uma forma de dividir os dados em quatro partes iguais. O 1º quartil é o valor abaixo do qual estão 25% dos dados; o 3º quartil, abaixo do qual estão 75%. A distância entre eles mostra o quão espalhados os valores estão no meio da distribuição.",
-  tsne: "Uma técnica que pega dados com milhares de \"dimensões\" (uma por bactéria, por exemplo) e os achata num mapa de duas dimensões fácil de olhar — amostras parecidas ficam pertinho, amostras diferentes ficam longe. Serve pra enxergar visualmente se existem grupos escondidos nos dados.",
+  tsne: "Uma técnica que pega dados com milhares de \"dimensões\" (uma por bactéria, por exemplo) e os achata num mapa de duas dimensões fácil de olhar — amostras parecidas ficam pertinho, amostras diferentes ficam longe. Serve pra enxergar visualmente se existem grupos escondidos nos dados. O parâmetro \"perplexidade\" controla o equilíbrio entre olhar vizinhos bem próximos ou um contexto mais amplo de cada amostra — valores entre 5 e 50 costumam funcionar bem, e vale testar mais de um.",
   vies: "Quando um modelo aprende a reconhecer algo que não era pra ele aprender — por exemplo, de qual projeto ou espécie de planta veio a amostra, em vez do que realmente importa (seca ou sanidade) — porque esses fatores, sem querer, também formam grupos bem separados nos dados.",
   phyloseq: "O formato de dados padrão em R para estudos de microbioma: junta numa única estrutura a tabela de contagens de cada ASV, a taxonomia de cada uma e os metadados das amostras (regime de rega, compartimento etc.), pra facilitar todas as análises seguintes.",
   wilcoxonMethod: "Um teste estatístico que compara dois grupos sem assumir que os dados seguem uma distribuição específica (como a curva de sino) — útil porque dados de microbioma raramente seguem essa curva.",
   edgerMethod: "Um método originalmente criado para comparar níveis de expressão de genes (RNA-seq), adaptado aqui para comparar quantidades de bactérias entre grupos.",
   deseqMethod: "Parecido com o edgeR na origem (RNA-seq), mas usa uma forma diferente de estimar o quanto os dados variam naturalmente antes de decidir se uma diferença é real.",
+  ancombcMethod: "Diferente dos outros quatro métodos (que vêm da genômica de expressão gênica), esse foi criado especificamente pra dados de microbioma — ele modela diretamente uma distorção conhecida desses dados (o fato de serem \"composicionais\": se uma bactéria aumenta, as outras parecem diminuir só por causa da matemática, não porque diminuíram de verdade).",
+  clr: "Uma transformação matemática (log-razão centrada) que corrige a distorção de dados \"composicionais\" — em vez de olhar a quantidade bruta de cada bactéria, olha a proporção dela em relação à média geométrica da amostra, o que evita comparações enganosas entre amostras com profundidade de sequenciamento diferente.",
+  correcaoBH: "Quando se testam milhares de ASVs ao mesmo tempo, uma parte vai dar \"significativa\" só por acaso, mesmo sem diferença real. A correção de Benjamini-Hochberg (BH) ajusta os p-valores pra manter esse risco de falso positivo sob controle, mesmo testando muitas hipóteses de uma vez.",
+  alfaSignificancia: "O limite que se define antes do teste pra decidir se um resultado conta como \"estatisticamente significativo\". Um alfa de 0,05 significa aceitar até 5% de chance de dizer que existe diferença quando na verdade não existe.",
+  upsetPlot: "Um gráfico que mostra, entre vários conjuntos de itens (aqui, as ASVs significativas de cada método), quantos itens cada combinação de conjuntos tem em comum — a barra mais alta costuma ser o grupo em que todo mundo concorda.",
+  consensoDaa: "As ASVs que aparecem como significativas em vários métodos de DAA ao mesmo tempo (não só um) — quanto mais métodos concordam sobre uma mesma ASV, mais confiável ela é como candidata a táxon marcador real, e não um artefato estatístico de um método específico.",
+  classificadorUniforme: "Uma versão do classificador do SILVA treinada sem dar peso extra a nenhum tipo de ambiente — a alternativa (\"weighted\"/ponderado) ajusta o classificador pra funcionar melhor num habitat específico (intestino, solo etc.), mas exige saber de antemão qual habitat esperar, o que nem sempre é o caso.",
+  acuracia: "A proporção de vezes que o modelo acertou a previsão (Controle ou Seca) sobre o total de amostras testadas. Simples de entender, mas pode enganar se os grupos forem muito desbalanceados.",
+  f1score: "Uma média que equilibra dois erros diferentes que o modelo pode cometer: dizer que uma amostra é \"Seca\" quando não é, ou deixar passar uma amostra que realmente é \"Seca\". Um F1 alto significa que o modelo é bom nos dois sentidos ao mesmo tempo, não só num deles.",
+  recallMetric: "De todas as amostras que realmente eram \"Seca\", quantas o modelo conseguiu identificar corretamente. Um recall alto significa que o modelo raramente deixa passar um caso positivo.",
+  aucMetric: "Resume o quão bem o modelo separa os dois grupos em todos os limiares de decisão possíveis, não só num ponto de corte fixo. Varia de 0,5 (chute aleatório) a 1,0 (separação perfeita).",
+  kribbella: "Um gênero de bactéria do solo (família Nocardioidaceae) que, no artigo original, apareceu como o marcador mais consistente de estresse hídrico entre os diferentes ranks taxonômicos testados — ou seja, a bactéria cuja quantidade mudou de forma mais confiável entre solo regado e solo sob seca.",
 };
 
 function Term({ id, children }: { id: string; children: React.ReactNode }) {
@@ -310,7 +322,15 @@ qiime tools import \\
     commands: [
       {
         code: `curl -L -o silva-v3v4-classifier.qza "https://www.arb-silva.de/archive/current/QIIME2/2026.7/SSU/V3V4-341f-806r/uniform/SILVA_144_SSURef_NR99_uniform_classifier_V3V4-341f-806r.qza"`,
-        caption: "Baixa o classificador do SILVA já treinado especificamente para a região V3–V4 (mesmos primers 341F/785R usados aqui) — encontrado no site oficial do SILVA depois que os links antigos do QIIME 2 deixaram de funcionar.",
+        caption: (
+          <>
+            Baixa o classificador <Term id="classificadorUniforme">uniforme</Term> do
+            SILVA já treinado especificamente para a região V3–V4 (mesmos
+            primers 341F/785R usados aqui) — encontrado no site oficial do
+            SILVA depois que os links antigos do QIIME 2 deixaram de
+            funcionar.
+          </>
+        ),
       },
       {
         code: `qiime feature-classifier classify-sklearn \\
@@ -1597,12 +1617,12 @@ export default function App() {
               táxons marcadores do que as que só um método aponta.
             </p>
             <table className="formal">
-              <caption><span className="cap-label">Tabela 6.</span> ASVs significativas por método (de 4.354 ASVs testadas, α = 0,05 com correção BH).</caption>
+              <caption><span className="cap-label">Tabela 6.</span> ASVs significativas por método (de 4.354 ASVs testadas, <Term id="alfaSignificancia">α</Term> = 0,05 com <Term id="correcaoBH">correção BH</Term>).</caption>
               <thead><tr><th>Método</th><th>Como funciona</th><th>ASVs significativas</th></tr></thead>
               <tbody>
                 <tr>
                   <td><Term id="wilcoxonMethod">Wilcoxon</Term></td>
-                  <td>Teste não-paramétrico simples, sobre dados transformados por CLR</td>
+                  <td>Teste não-paramétrico simples, sobre dados transformados por <Term id="clr">CLR</Term></td>
                   <td>2.100</td>
                 </tr>
                 <tr>
@@ -1621,7 +1641,7 @@ export default function App() {
                   <td>590</td>
                 </tr>
                 <tr>
-                  <td>ANCOM-BC2</td>
+                  <td><Term id="ancombcMethod">ANCOM-BC2</Term></td>
                   <td>Modela diretamente o viés de composição dos dados de microbioma</td>
                   <td>1.708</td>
                 </tr>
@@ -1646,15 +1666,16 @@ export default function App() {
                 variância se comporta nos dados, e o ALDEx2 em particular é
                 o mais conservador, por incorporar a incerteza da
                 composição antes mesmo de testar. A comparação de
-                sobreposição entre os cinco conjuntos, gerada via UpSetR,
-                mostra o número que realmente importa aqui:{" "}
-                <strong>668 ASVs foram significativas nos 5 métodos ao
-                mesmo tempo</strong> — esse é o conjunto mais confiável de
-                candidatas a táxons marcadores, porque nenhum dos cinco
-                métodos discorda dele. Os próximos maiores grupos (472,
-                432, 389 ASVs) são interseções quase completas, faltando
-                só um método por vez, o que reforça que a convergência
-                entre métodos é a regra, não a exceção.
+                sobreposição entre os cinco conjuntos, gerada via{" "}
+                <Term id="upsetPlot">UpSetR</Term>, mostra o número que
+                realmente importa aqui: <strong>668 ASVs foram
+                significativas nos 5 métodos ao mesmo tempo</strong> — esse
+                é o <Term id="consensoDaa">conjunto de consenso</Term> mais
+                confiável de candidatas a táxons marcadores, porque nenhum
+                dos cinco métodos discorda dele. Os próximos maiores grupos
+                (472, 432, 389 ASVs) são interseções quase completas,
+                faltando só um método por vez, o que reforça que a
+                convergência entre métodos é a regra, não a exceção.
               </p>
             </div>
 
@@ -1755,11 +1776,11 @@ export default function App() {
               <caption><span className="cap-label">Tabela 9.</span> Desempenho do Random Forest no artigo original (nível de gênero, dataset Grass-Drought).</caption>
               <thead><tr><th>Métrica</th><th>Valor publicado</th></tr></thead>
               <tbody>
-                <tr><td>Acurácia</td><td>0,923 ± 0,029</td></tr>
-                <tr><td>F1-score</td><td>0,921 ± 0,030</td></tr>
-                <tr><td>Recall</td><td>0,954 ± 0,029</td></tr>
-                <tr><td>AUC</td><td>0,980 ± 0,010</td></tr>
-                <tr><td>Táxon marcador mais consistente</td><td>Gênero <em>Kribbella</em></td></tr>
+                <tr><td><Term id="acuracia">Acurácia</Term></td><td>0,923 ± 0,029</td></tr>
+                <tr><td><Term id="f1score">F1-score</Term></td><td>0,921 ± 0,030</td></tr>
+                <tr><td><Term id="recallMetric">Recall</Term></td><td>0,954 ± 0,029</td></tr>
+                <tr><td><Term id="aucMetric">AUC</Term></td><td>0,980 ± 0,010</td></tr>
+                <tr><td>Táxon marcador mais consistente</td><td>Gênero <Term id="kribbella"><em>Kribbella</em></Term></td></tr>
                 <tr><td>Concordância DAA × SHAP (todos os ranks)</td><td>79,6% a 82,6%</td></tr>
               </tbody>
             </table>
