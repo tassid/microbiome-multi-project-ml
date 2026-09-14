@@ -1,27 +1,110 @@
 import React, { useState, useEffect, useCallback } from "react";
 
 /**
- * Apresentação de slides — Réplica de Hagen et al. (2024)
+ * Apresentação de slides: réplica de Hagen et al. (2024)
  * Preparada como pré-defesa / apresentação de andamento de mestrado (PPGTCA/UTFPR).
  * Navegação: setas do teclado, clique nas bordas, ou botões.
  */
 
 // ---------- Pequenos componentes de gráfico (auto-contidos) ----------
 
-function MiniBar({ data, max }: { data: { label: string; value: number }[]; max?: number }) {
-  const m = max ?? Math.max(...data.map((d) => d.value));
+function MiniBar({
+  data,
+  max,
+  unit = "",
+  yLabel,
+}: {
+  data: { label: string; value: number }[];
+  max?: number;
+  unit?: string;
+  yLabel?: string;
+}) {
+  const m = (max ?? Math.max(...data.map((d) => d.value))) * 1.12;
+  const W = 640;
+  const rowH = 46;
+  const padL = 150;
+  const padR = 70;
+  const padT = 12;
+  const padB = 34;
+  const plotW = W - padL - padR;
+  const H = data.length * rowH + padT + padB;
+  const scaleX = (v: number) => (v / m) * plotW;
+  const nTicks = 5;
+  const ticks = Array.from({ length: nTicks + 1 }, (_, i) => (m * i) / nTicks);
+
   return (
-    <div className="mini-bar">
-      {data.map((d) => (
-        <div className="mini-bar-row" key={d.label}>
-          <span className="mini-bar-label">{d.label}</span>
-          <div className="mini-bar-track">
-            <div className="mini-bar-fill" style={{ width: `${(d.value / m) * 100}%` }} />
-          </div>
-          <span className="mini-bar-value">{d.value.toLocaleString("pt-BR")}</span>
-        </div>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: 720 }} role="img">
+      {/* grade vertical + eixo x no topo */}
+      {ticks.map((t) => (
+        <g key={t}>
+          <line
+            x1={padL + scaleX(t)}
+            y1={padT}
+            x2={padL + scaleX(t)}
+            y2={H - padB}
+            stroke="#e3d9b8"
+            strokeWidth={1}
+          />
+          <text
+            x={padL + scaleX(t)}
+            y={H - padB + 18}
+            textAnchor="middle"
+            fontSize="12.5"
+            fill="#6b6b6b"
+            fontFamily="Georgia, serif"
+          >
+            {Math.round(t).toLocaleString("pt-BR")}
+          </text>
+        </g>
       ))}
-    </div>
+      {yLabel && (
+        <text x={padL + plotW / 2} y={H - 4} textAnchor="middle" fontSize="12" fill="#8a8a8a">
+          {yLabel}
+        </text>
+      )}
+      {/* eixo y (linha base das barras) */}
+      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#3a3a3a" strokeWidth={1.4} />
+
+      {data.map((d, i) => {
+        const y = padT + i * rowH;
+        const barH = rowH * 0.5;
+        const w = scaleX(d.value);
+        return (
+          <g key={d.label}>
+            <text
+              x={padL - 12}
+              y={y + rowH / 2 + 5}
+              textAnchor="end"
+              fontSize="16"
+              fill="#1a1a1a"
+              fontFamily="Georgia, serif"
+            >
+              {d.label}
+            </text>
+            <rect
+              x={padL}
+              y={y + (rowH - barH) / 2}
+              width={w}
+              height={barH}
+              fill="#f2b632"
+              stroke="#8a6a10"
+              strokeWidth={1}
+              rx={2}
+            />
+            <text
+              x={padL + w + 10}
+              y={y + rowH / 2 + 5}
+              fontSize="15"
+              fontWeight={700}
+              fill="#1a1a1a"
+              fontFamily="Georgia, serif"
+            >
+              {d.value.toLocaleString("pt-BR")}{unit}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -30,42 +113,115 @@ function MiniLine({
   series,
   yMin = 0,
   yMax = 1,
+  yLabel,
+  decimals = 2,
 }: {
   categories: string[];
   series: { label: string; values: number[]; color: string }[];
   yMin?: number;
   yMax?: number;
+  yLabel?: string;
+  decimals?: number;
 }) {
-  const W = 620;
-  const H = 280;
-  const padL = 50;
-  const padR = 24;
-  const padT = 20;
-  const padB = 40;
+  const W = 760;
+  const H = 400;
+  const padL = 68;
+  const padR = 30;
+  const padT = 24;
+  const padB = 56;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const scaleX = (i: number) => padL + (i / (categories.length - 1)) * plotW;
   const scaleY = (v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+  const nTicks = 5;
+  const ticks = Array.from({ length: nTicks + 1 }, (_, i) => yMin + (i * (yMax - yMin)) / nTicks);
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: 620 }}>
-      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#c7bd9e" />
-      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#c7bd9e" />
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: 760 }} role="img">
+      {/* grade horizontal */}
+      {ticks.map((t) => (
+        <g key={t}>
+          <line x1={padL} y1={scaleY(t)} x2={W - padR} y2={scaleY(t)} stroke="#eee2c2" strokeWidth={1} />
+          <text x={padL - 10} y={scaleY(t) + 5} textAnchor="end" fontSize="14" fill="#6b6b6b" fontFamily="Georgia, serif">
+            {t.toFixed(decimals)}
+          </text>
+        </g>
+      ))}
+      {/* grade vertical (por categoria) */}
       {categories.map((c, i) => (
-        <text key={c} x={scaleX(i)} y={H - padB + 20} textAnchor="middle" fontSize="13" fill="#5a5a5a">
+        <line
+          key={c}
+          x1={scaleX(i)}
+          y1={padT}
+          x2={scaleX(i)}
+          y2={H - padB}
+          stroke="#f4ecd4"
+          strokeWidth={1}
+        />
+      ))}
+      {/* eixos */}
+      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#3a3a3a" strokeWidth={1.4} />
+      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="#3a3a3a" strokeWidth={1.4} />
+
+      {categories.map((c, i) => (
+        <text
+          key={c}
+          x={scaleX(i)}
+          y={H - padB + 26}
+          textAnchor="middle"
+          fontSize="15"
+          fill="#1a1a1a"
+          fontFamily="Georgia, serif"
+        >
           {c}
         </text>
       ))}
+      {yLabel && (
+        <text
+          x={18}
+          y={padT + plotH / 2}
+          textAnchor="middle"
+          fontSize="12.5"
+          fill="#8a8a8a"
+          transform={`rotate(-90, 18, ${padT + plotH / 2})`}
+        >
+          {yLabel}
+        </text>
+      )}
+
       {series.map((s) => (
         <g key={s.label}>
           <polyline
             fill="none"
             stroke={s.color}
-            strokeWidth={2.5}
+            strokeWidth={3}
             points={s.values.map((v, i) => `${scaleX(i)},${scaleY(v)}`).join(" ")}
           />
           {s.values.map((v, i) => (
-            <circle key={i} cx={scaleX(i)} cy={scaleY(v)} r={4} fill={s.color} />
+            <g key={i}>
+              <circle cx={scaleX(i)} cy={scaleY(v)} r={5.5} fill="#fff" stroke={s.color} strokeWidth={2.5} />
+              <text
+                x={scaleX(i)}
+                y={scaleY(v) - 12}
+                textAnchor="middle"
+                fontSize="12"
+                fontWeight={700}
+                fill={s.color}
+              >
+                {v.toFixed(decimals)}
+              </text>
+            </g>
           ))}
+        </g>
+      ))}
+
+      {/* legenda */}
+      {series.map((s, i) => (
+        <g key={s.label} transform={`translate(${padL + i * 160}, ${padT - 8})`}>
+          <line x1={0} y1={0} x2={20} y2={0} stroke={s.color} strokeWidth={3} />
+          <text x={26} y={4} fontSize="13" fill="#1a1a1a">
+            {s.label}
+          </text>
         </g>
       ))}
     </svg>
@@ -120,7 +276,7 @@ const slides: Slide[] = [
           interpretável de estresse hídrico
         </h1>
         <p className="subtitle">
-          Etapa preparatória da dissertação de mestrado — classificação de
+          Etapa preparatória da dissertação de mestrado, classificação de
           sanidade em soja a partir do microbioma
         </p>
         <div className="title-meta">Tassiane Anzolin · Programa de Pós-Graduação em Tecnologias Computacionais para o Agronegócio</div>
@@ -158,14 +314,14 @@ const slides: Slide[] = [
         <h2>Objeto da dissertação</h2>
         <Concept term="microbioma">
           O conjunto de micro-organismos (principalmente bactérias) que vivem
-          associados a um ambiente — aqui, ao redor e dentro das raízes das
+          associados a um ambiente: aqui, ao redor e dentro das raízes das
           plantas.
         </Concept>
         <Bullets
           items={[
             <>Classificar <strong>sanidade em soja</strong> a partir do microbioma associado à cultura</>,
             <>Combinar dados de <strong>múltiplos projetos</strong> de soja, não um único estudo controlado</>,
-            <>Lacuna identificada: a maioria dos trabalhos trata o "projeto de origem" como irrelevante — mas ele pode confundir a análise</>,
+            <>Lacuna identificada: a maioria dos trabalhos trata o "projeto de origem" como irrelevante, mas ele pode confundir a análise</>,
           ]}
         />
       </>
@@ -205,7 +361,7 @@ const slides: Slide[] = [
         <h2>Hagen et al. (2024)</h2>
         <p className="lede">
           "Interpretable machine learning decodes soil microbiome's response
-          to drought stress" — Environmental Microbiome, 19(35).
+          to drought stress", Environmental Microbiome, 19(35).
         </p>
         <Bullets
           items={[
@@ -295,7 +451,7 @@ const slides: Slide[] = [
         <h2>Obtenção dos dados brutos</h2>
         <Bullets
           items={[
-            <>623 accessions SRA identificados a partir do <em>metadata.csv</em> do repositório do artigo — não do BioProject inteiro (que mistura outros experimentos)</>,
+            <>623 accessions SRA identificados a partir do <em>metadata.csv</em> do repositório do artigo, não do BioProject inteiro (que mistura outros experimentos)</>,
             "Download via qiime fondue get-sequences, direto do NCBI SRA",
             "0 falhas em 623 amostras (~18,7 GB de dados)",
           ]}
@@ -311,14 +467,14 @@ const slides: Slide[] = [
         <h2>Remoção de primers e DADA2</h2>
         <Concept term="ASV e DADA2">
           ASV é uma sequência de DNA identificada com precisão de
-          nucleotídeo — cada uma representa uma "bactéria" distinta
+          nucleotídeo: cada uma representa uma "bactéria" distinta
           encontrada na amostra. DADA2 é o algoritmo que transforma as
           leituras brutas do sequenciador nessa tabela de ASVs, corrigindo
           erros de leitura.
         </Concept>
         <Bullets
           items={[
-            "Primers 341F/785R (região V3–V4 do 16S), removidos via cutadapt — 98,4% das leituras aproveitadas",
+            "Primers 341F/785R (região V3–V4 do 16S), removidos via cutadapt, com 98,4% das leituras aproveitadas",
             "DADA2: aprendizado de erro, inferência de ASVs, junção de pares, remoção de quimeras",
             <>Resultado: <strong>36.543 ASVs</strong> em 623 amostras</>,
           ]}
@@ -336,7 +492,7 @@ const slides: Slide[] = [
           items={[
             "Classificador SILVA treinado especificamente para a região V3-V4",
             "99,7% das ASVs classificadas com sucesso, confiança média 0,97",
-            "Composição dominada por Pseudomonadota, Bacteroidota e Actinomycetota — esperado para solo/raiz",
+            "Composição dominada por Pseudomonadota, Bacteroidota e Actinomycetota, esperado para solo/raiz",
           ]}
         />
         <MiniBar
@@ -347,7 +503,7 @@ const slides: Slide[] = [
           ]}
         />
         <Concept term="taxonomia e SILVA">
-          Taxonomia é o "nome científico" de cada bactéria — de que família,
+          Taxonomia é o "nome científico" de cada bactéria: de que família,
           gênero ou espécie ela é. SILVA é o banco de dados de referência
           com milhares de sequências já identificadas, usado como
           dicionário pra dar esse nome a cada ASV.
@@ -390,7 +546,7 @@ const slides: Slide[] = [
           </div>
         </div>
         <p className="lede small">
-          Controle e Seca não têm comunidades mais ou menos diversas — têm
+          Controle e Seca não têm comunidades mais ou menos diversas; têm
           comunidades <em>diferentes</em>, em composição.
         </p>
       </>
@@ -418,7 +574,7 @@ const slides: Slide[] = [
           ]}
         />
         <p className="lede small">
-          <strong>668 ASVs</strong> significativas nos 5 métodos ao mesmo tempo —
+          <strong>668 ASVs</strong> significativas nos 5 métodos ao mesmo tempo:
           o conjunto de consenso mais confiável.
         </p>
       </>
@@ -446,6 +602,8 @@ const slides: Slide[] = [
           ]}
           yMin={0}
           yMax={320}
+          decimals={0}
+          yLabel="Táxons significativos"
         />
       </>
     ),
@@ -468,13 +626,13 @@ const slides: Slide[] = [
         <h2>As amostras se agrupam pelo motivo certo?</h2>
         <Concept term="t-SNE">
           Técnica que pega dados com milhares de "dimensões" (uma por
-          bactéria) e os achata num mapa 2D fácil de olhar — amostras
+          bactéria) e os achata num mapa 2D fácil de olhar: amostras
           parecidas ficam pertinho, diferentes ficam longe. Serve pra
           enxergar visualmente se existem grupos escondidos nos dados.
         </Concept>
         <Bullets
           items={[
-            "t-SNE geral: compartimento (solo/raiz/rizosfera) domina a projeção — não regime de rega",
+            "t-SNE geral: compartimento (solo/raiz/rizosfera) domina a projeção, não regime de rega",
             "Espécie de planta: bem misturada, sem confundimento",
             "t-SNE estratificada por compartimento: separação Controle/Seca aparece nos 3, com intensidade diferente",
           ]}
@@ -524,7 +682,7 @@ const slides: Slide[] = [
         <h2>Random Forest com validação cruzada aninhada</h2>
         <Concept term="validação cruzada aninhada (Nested CV)">
           Um jeito cuidadoso de testar o modelo: um laço externo avalia o
-          desempenho, um laço interno ajusta os parâmetros — em camadas
+          desempenho, um laço interno ajusta os parâmetros, em camadas
           separadas, pra garantir que o modelo não "colou" nos dados de
           teste.
         </Concept>
@@ -547,7 +705,7 @@ const slides: Slide[] = [
         <Concept term="acurácia e AUC">
           Acurácia é a proporção de acertos do modelo. AUC resume o quão
           bem ele separa os dois grupos em todos os limiares de decisão
-          possíveis — varia de 0,5 (chute aleatório) a 1,0 (separação
+          possíveis: varia de 0,5 (chute aleatório) a 1,0 (separação
           perfeita).
         </Concept>
         <MiniLine
@@ -559,7 +717,7 @@ const slides: Slide[] = [
           yMin={0.85}
           yMax={1.0}
         />
-        <p className="lede small">Gênero: melhor desempenho — igual ao artigo original.</p>
+        <p className="lede small">Gênero: melhor desempenho, igual ao artigo original.</p>
       </>
     ),
   },
@@ -591,7 +749,7 @@ const slides: Slide[] = [
       </>
     ),
   },
-  // 26. Kribbella — o achado mais forte
+  // 26. Kribbella: o achado mais forte
   {
     content: (
       <>
@@ -599,13 +757,13 @@ const slides: Slide[] = [
         <h2 className="highlight-title">O achado mais forte da replicação</h2>
         <p className="lede">
           O táxon marcador nº 1 apontado pelo SHAP foi o gênero{" "}
-          <em>Kribbella</em> — <strong>exatamente o mesmo</strong> relatado
+          <em>Kribbella</em>, <strong>exatamente o mesmo</strong> relatado
           por Hagen et al. (2024) como o marcador mais consistente.
         </p>
         <p className="lede small">
           Combinado ao AUC quase idêntico (0,979 vs. 0,980), essa
           coincidência é forte evidência de que o pipeline captura o mesmo
-          sinal biológico do estudo original — não um artefato do
+          sinal biológico do estudo original, não um artefato do
           processamento.
         </p>
       </>
@@ -628,7 +786,7 @@ const slides: Slide[] = [
           </div>
         </div>
         <p className="lede small">
-          Mesma ordem de grandeza — diferença esperada, já que o critério
+          Mesma ordem de grandeza; diferença esperada, já que o critério
           exato do artigo não está publicamente documentado.
         </p>
       </>
@@ -645,7 +803,7 @@ const slides: Slide[] = [
             "Aplicar o modelo treinado no Grass-Drought, sem retreinar, num dataset novo",
             "Dataset Sorghum-Drought: 449 amostras (233 Controle / 216 Seca)",
             "Investigação revelou 3 grupos de tratamento reais (Controle, seca pré e pós-florescimento)",
-            "Em andamento — download e processamento das 449 amostras",
+            "Em andamento: download e processamento das 449 amostras",
           ]}
         />
       </>
@@ -668,7 +826,24 @@ const slides: Slide[] = [
       </>
     ),
   },
-  // 30. Próximos passos + obrigada
+  // 30. Conclusão
+  {
+    content: (
+      <>
+        <Kicker>Conclusão</Kicker>
+        <h2>O que este trabalho demonstra</h2>
+        <Bullets
+          items={[
+            <>Pipeline replicado <strong>do dado bruto ao modelo final</strong>, com resultados batendo de perto com o artigo original em todas as frentes</>,
+            <>Diversidade, DAA, t-SNE e ML convergem para a mesma conclusão biológica, inclusive o táxon marcador (<em>Kribbella</em>)</>,
+            "Investigação de dados reais (BioProjects confusos, tipos de sequenciamento misturados) já foi enfrentada e resolvida",
+            <>Pipeline <strong>validado e pronto</strong> para ser adaptado aos dados reais de soja</>,
+          ]}
+        />
+      </>
+    ),
+  },
+  // 31. Próximos passos + obrigada
   {
     variant: "section",
     content: (
@@ -682,7 +857,7 @@ const slides: Slide[] = [
             "Aplicar o pipeline validado com a validação leave-one-project-out",
           ]}
         />
-        <div className="thanks">Obrigada — perguntas?</div>
+        <div className="thanks">Obrigada! Perguntas?</div>
       </>
     ),
   },
@@ -1093,7 +1268,7 @@ export default function Apresentacao() {
 
       <div className="footer-bar">
         <span>Tassiane Anzolin · PPGTCA/UTFPR</span>
-        <span className="center">Réplica Hagen et al. (2024) — microbioma e estresse hídrico</span>
+        <span className="center">Réplica Hagen et al. (2024): microbioma e estresse hídrico</span>
         <span>{index + 1} / {slides.length}</span>
       </div>
 
