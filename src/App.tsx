@@ -155,6 +155,7 @@ const STEP_ICONS: Record<number, React.ReactNode> = {
   8: <Eye size={17} />,
   9: <Brain size={17} />,
   10: <Check size={17} />,
+  11: <FlaskConical size={17} />,
 };
 
 type CommandEntry = string | { code: string; caption: React.ReactNode };
@@ -1115,6 +1116,113 @@ shap_summary.to_csv("shap_marker_taxa_genus.csv", index=False)
 print("\\nResultados completos salvos em: shap_marker_taxa_genus.csv")`,
         caption: "Script completo (ml_rfc_shap.py): roda o Random Forest com nested CV nos 5 níveis taxonômicos, salva a comparação num CSV, e interpreta o nível de gênero via SHAP, salvando os táxons marcadores noutro CSV.",
       },
+      {
+        code: `# Exporta as listas de táxons significativos (nível gênero) dos 3
+# métodos de DAA, para cruzar depois com os resultados do SHAP.
+
+load("daa_todos_os_ranks.RData")
+
+genus_res <- resultados_por_rank[["Genus"]]
+
+deseq_taxa    <- genus_res$deseq$feature
+ancombc_taxa  <- genus_res$ancombc2$taxon
+aldex_taxa    <- rownames(genus_res$aldex2)
+
+cat("DESeq2 (genus):   ", length(deseq_taxa), "táxons\\n")
+cat("ANCOM-BC2 (genus):", length(ancombc_taxa), "táxons\\n")
+cat("ALDEx2 (genus):   ", length(aldex_taxa), "táxons\\n")
+
+write.csv(data.frame(taxon = deseq_taxa, metodo = "DESeq2"),
+          "daa_genus_deseq2.csv", row.names = FALSE)
+write.csv(data.frame(taxon = ancombc_taxa, metodo = "ANCOMBC2"),
+          "daa_genus_ancombc2.csv", row.names = FALSE)
+write.csv(data.frame(taxon = aldex_taxa, metodo = "ALDEx2"),
+          "daa_genus_aldex2.csv", row.names = FALSE)
+
+cat("\\nTrês arquivos CSV salvos (um por método, nível gênero).\\n")`,
+        caption: "Script completo (export_daa_genus_taxa.R): extrai as listas de táxons significativos de cada um dos 3 métodos de DAA no nível gênero, salvando em CSV pra cruzar com o SHAP.",
+      },
+      {
+        code: `"""
+Concordância DAA x SHAP, no nível de gênero.
+Cruza os táxons significativos pela DAA (consenso de pelo menos
+2 dos 3 métodos mais consistentes) com os táxons mais importantes
+segundo o SHAP, para checar a taxa de concordância entre as duas
+formas de identificar marcadores biológicos.
+"""
+
+import re
+import pandas as pd
+
+def extrair_genero(nome_taxon: str) -> str:
+    """Extrai só o nome do gênero, seja de uma string completa
+    (d__...;g__Kribbella) ou de um nome já isolado (Kribbella)."""
+    match = re.search(r"g__([^;]+)", str(nome_taxon))
+    if match:
+        genero = match.group(1)
+    else:
+        genero = str(nome_taxon)
+    return genero.strip().replace("__other", "").replace("Incertae_Sedis", "").strip()
+
+
+# -------------------------------------------------------------
+# 1. Carregar os 3 conjuntos de táxons significativos pela DAA
+# -------------------------------------------------------------
+deseq = pd.read_csv("daa_genus_deseq2.csv")
+ancombc = pd.read_csv("daa_genus_ancombc2.csv")
+aldex = pd.read_csv("daa_genus_aldex2.csv")
+
+generos_deseq = set(extrair_genero(t) for t in deseq["taxon"]) - {""}
+generos_ancombc = set(extrair_genero(t) for t in ancombc["taxon"]) - {""}
+generos_aldex = set(extrair_genero(t) for t in aldex["taxon"]) - {""}
+
+# consenso: significativo em pelo menos 2 dos 3 métodos
+todos_generos = generos_deseq | generos_ancombc | generos_aldex
+consenso_daa = {
+    g for g in todos_generos
+    if sum([g in generos_deseq, g in generos_ancombc, g in generos_aldex]) >= 2
+}
+
+print(f"Táxons únicos (união dos 3 métodos): {len(todos_generos)}")
+print(f"Consenso DAA (>=2 de 3 métodos):     {len(consenso_daa)}")
+
+# -------------------------------------------------------------
+# 2. Carregar os táxons mais importantes segundo o SHAP
+# -------------------------------------------------------------
+shap_df = pd.read_csv("shap_marker_taxa_genus.csv")
+shap_df["genero"] = shap_df["taxon"].apply(extrair_genero)
+shap_df = shap_df[shap_df["genero"] != ""]
+
+# top N táxons por importância SHAP (mesmo N do consenso DAA, pra comparação justa)
+n_top = len(consenso_daa)
+top_shap = set(shap_df.sort_values("shap_medio_abs", ascending=False)["genero"].head(n_top))
+
+print(f"Top {n_top} táxons por SHAP (mesmo tamanho do consenso DAA)")
+
+# -------------------------------------------------------------
+# 3. Calcular a concordância
+# -------------------------------------------------------------
+intersecao = consenso_daa & top_shap
+uniao = consenso_daa | top_shap
+
+concordancia_jaccard = len(intersecao) / len(uniao) if uniao else 0
+concordancia_recall = len(intersecao) / len(consenso_daa) if consenso_daa else 0
+
+print(f"\\nTáxons em comum (DAA consenso ∩ SHAP top): {len(intersecao)}")
+print(f"Concordância (Jaccard, interseção/união):   {concordancia_jaccard:.1%}")
+print(f"Concordância (interseção/consenso DAA):     {concordancia_recall:.1%}")
+print(f"\\nTáxons em comum: {sorted(intersecao)}")
+
+resultado = pd.DataFrame({
+    "genero": sorted(uniao),
+    "em_consenso_daa": [g in consenso_daa for g in sorted(uniao)],
+    "em_top_shap": [g in top_shap for g in sorted(uniao)],
+})
+resultado["em_ambos"] = resultado["em_consenso_daa"] & resultado["em_top_shap"]
+resultado.to_csv("concordancia_daa_shap.csv", index=False)
+print("\\nTabela completa salva em: concordancia_daa_shap.csv")`,
+        caption: "Script completo (concordancia_daa_shap.py): calcula o consenso da DAA (>=2 de 3 métodos), o topo do SHAP de mesmo tamanho, e a concordância entre os dois conjuntos.",
+      },
     ],
   },
   {
@@ -1129,11 +1237,60 @@ print("\\nResultados completos salvos em: shap_marker_taxa_genus.csv")`,
         importantes são as mesmas que o artigo aponta? A resposta, nas
         duas frentes, foi sim (seção 5.6) — sinal de que o pipeline
         inteiro, do download dos dados brutos até o modelo final, foi
-        reproduzido corretamente, e está pronto pra ser adaptado com
-        dados reais de soja.
+        reproduzido corretamente.
       </>
     ),
     commands: [],
+  },
+  {
+    n: 11,
+    title: "Teste de generalização (Sorghum-Drought)",
+    note: (
+      <>
+        Etapa opcional do artigo original: aplicar o Random Forest já
+        treinado no Grass-Drought (sem retreinar) num segundo dataset
+        independente — sorgo em vez de gramíneas diversas — pra ver se o
+        modelo generaliza além do experimento onde foi treinado. Achar o
+        dataset certo deu mais trabalho que o esperado (detalhes na seção
+        5.8): o BioProject PRJNA435634 mistura sequenciamento shotgun
+        (WGS) com amplicon 16S, e ainda tem um lote de amostras de{" "}
+        <em>tomate</em> misturado junto — nada disso serve. O subconjunto
+        certo (16S, sorgo, compartimentos raiz/solo/rizosfera) tem 3
+        grupos de tratamento (Controle, seca antes do florescimento, seca
+        depois do florescimento), dos quais foram selecionadas 449
+        amostras (Controle + seca pré-florescimento, semanas 2–7 e
+        10–17) para esse teste.
+      </>
+    ),
+    commands: [
+      {
+        code: `(echo "ID"; cat sorghum_drought_accessions.txt) > sorghum_accessions_header.tsv
+
+qiime tools import \\
+  --type NCBIAccessionIDs \\
+  --input-path sorghum_accessions_header.tsv \\
+  --output-path sorghum-ids.qza`,
+        caption: "Importa a lista de 449 accessions SRA identificadas manualmente no NCBI Run Selector (Organism = plant metagenome, Assay Type = AMPLICON, tratamento Control/Pre_flowering, semanas 2–7 e 10–17).",
+      },
+      {
+        code: `qiime fondue get-sequences \\
+  --i-accession-ids sorghum-ids.qza \\
+  --p-email <email> \\
+  --p-threads 4 \\
+  --output-dir sequencias_sorghum`,
+        caption: "Baixa as 449 sequências brutas do NCBI SRA — mesmo processo usado para o Grass-Drought.",
+      },
+      {
+        code: `qiime cutadapt trim-paired \\
+  --i-demultiplexed-sequences sequencias_sorghum/paired_reads.qza \\
+  --p-front-f CCTACGGGNBGCASCAG \\
+  --p-front-r GACTACNVGGGTATCTAATCC \\
+  --p-discard-untrimmed \\
+  --p-cores 4 \\
+  --output-dir cutadapt_output_sorghum`,
+        caption: "Remove os mesmos primers 341F/785R — a região do 16S sequenciada é a mesma, só muda a espécie de planta.",
+      },
+    ],
   },
 ];
 
@@ -1888,9 +2045,9 @@ export default function App() {
             <h2 className="sec"><span className="sec-num">5.</span>Resultados obtidos até agora</h2>
             <p>
               Um resumo consolidado de todos os números produzidos pela
-              replicação até o momento, organizado por etapa. A replicação
-              está essencialmente completa — falta apenas consolidar a
-              comparação final (etapa 10).
+              replicação até o momento, organizado por etapa. O núcleo da
+              replicação está completo; falta apenas o teste de
+              generalização opcional (etapa 11), em andamento.
             </p>
 
             <h3 className="sub-title">5.1 Processamento DADA2 e taxonomia</h3>
@@ -2253,12 +2410,116 @@ export default function App() {
               </p>
             </div>
 
+            <h3 className="sub-title">5.7 Concordância DAA × SHAP</h3>
+            <p>
+              O artigo original também verifica se os táxons apontados
+              como significativos pela DAA são os mesmos que o SHAP aponta
+              como importantes — dois caminhos estatísticos diferentes
+              chegando (ou não) à mesma conclusão biológica. Reproduzindo
+              essa lógica no nível de gênero (consenso de pelo menos 2 dos
+              3 métodos de DAA, comparado aos táxons de maior peso no
+              SHAP):
+            </p>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 11.</span> Concordância entre táxons significativos pela DAA e táxons importantes pelo SHAP (nível gênero).</caption>
+              <thead><tr><th>Métrica</th><th>Valor</th></tr></thead>
+              <tbody>
+                <tr><td>Táxons no consenso da DAA (≥ 2 de 3 métodos)</td><td>173</td></tr>
+                <tr><td>Táxons em comum com o topo do SHAP</td><td>106</td></tr>
+                <tr><td>Concordância (interseção / consenso DAA)</td><td>61,3%</td></tr>
+                <tr><td>Concordância (Jaccard, interseção / união)</td><td>44,2%</td></tr>
+                <tr><td>Concordância no artigo original (todos os ranks)</td><td>79,6% a 82,6%</td></tr>
+              </tbody>
+            </table>
+            <div className="callout">
+              <div className="callout-label">leitura do resultado</div>
+              <p>
+                61,3% fica um pouco abaixo do artigo original, mas na mesma
+                ordem de grandeza — uma diferença esperada, já que o
+                critério exato usado no código original pra definir
+                "consenso da DAA" e "topo do SHAP" não está disponível
+                publicamente, então essa reprodução usa uma regra
+                equivalente e razoável (não idêntica). O mais importante:{" "}
+                <em>Kribbella</em> — o táxon marcador nº 1 de todo o
+                estudo — está entre os 106 táxons em que as duas
+                abordagens concordam, o que reforça pela terceira vez
+                (diversidade, SHAP e agora DAA×SHAP) que esse gênero é um
+                marcador robusto de estresse hídrico neste dataset.
+              </p>
+            </div>
+
+            <h3 className="sub-title">5.8 Teste de generalização: encontrando o dataset Sorghum-Drought</h3>
+            <p>
+              A última etapa do artigo original testa o modelo treinado no
+              Grass-Drought contra um segundo dataset independente, sem
+              retreinar — sorgo em vez de gramíneas diversas. Encontrar os
+              dados certos deu bem mais trabalho do que esperado, e vale
+              registrar o processo:
+            </p>
+            <ul className="term-list">
+              <li>
+                <span className="concept-icon"><BarChart3 size={16} /></span>
+                <span className="concept-text">
+                  O BioProject citado no artigo (PRJNA435634) tem 819
+                  registros, mas a maioria (47) é sequenciamento{" "}
+                  <em>shotgun</em> (WGS) — incompatível com todo o pipeline
+                  16S construído até aqui.
+                </span>
+              </li>
+              <li>
+                <span className="concept-icon"><Eye size={16} /></span>
+                <span className="concept-text">
+                  Dentro dos registros amplicon (772), havia um lote de{" "}
+                  <em>tomate</em> (não sorgo) de um experimento de estufa
+                  diferente, misturado no mesmo BioProject guarda-chuva —
+                  precisou ser identificado e descartado pelo nome da
+                  amostra.
+                </span>
+              </li>
+              <li>
+                <span className="concept-icon"><FlaskConical size={16} /></span>
+                <span className="concept-text">
+                  O desenho experimental real tem <strong>3 grupos de
+                  tratamento</strong>, não 2: Controle, seca imposta antes
+                  do florescimento, e seca imposta depois do florescimento
+                  — uma nuance que não estava óbvia até examinar os dados
+                  de verdade.
+                </span>
+              </li>
+            </ul>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 12.</span> Composição final do subconjunto Sorghum-Drought selecionado para o teste de generalização.</caption>
+              <thead><tr><th>Critério</th><th>Valor</th></tr></thead>
+              <tbody>
+                <tr><td>Amostras totais</td><td>449</td></tr>
+                <tr><td>Controle / Seca</td><td>233 / 216</td></tr>
+                <tr><td>Compartimentos</td><td>Raiz (160) · Solo (150) · Rizosfera (139)</td></tr>
+                <tr><td>Critério de seleção</td><td>Controle + seca pré-florescimento, semanas 2–7 e 10–17</td></tr>
+              </tbody>
+            </table>
+            <div className="callout">
+              <div className="callout-label">transparência sobre o critério</div>
+              <p>
+                O artigo original menciona valores específicos de amostras
+                para essa etapa, mas o critério exato de seleção não está
+                claramente documentado nas fontes disponíveis. Em vez de
+                adivinhar até bater um número, esta replicação usa um
+                critério próprio, definido de forma explícita e
+                reproduzível (acima) — uma aproximação razoável, não uma
+                réplica byte-a-byte do subconjunto original. O download e
+                processamento dessas 449 amostras está em andamento; os
+                resultados da etapa 11 (aplicar o modelo já treinado, sem
+                retreinar) serão adicionados aqui quando terminarem.
+              </p>
+            </div>
+
             <p>
               A Análise de Abundância Diferencial com os 5 métodos (DESeq2,
-              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon) e o Machine Learning
-              (Random Forest + SHAP) foram concluídos com sucesso. Falta
-              apenas a etapa 10: a comparação final e consolidada com todos
-              os valores publicados.
+              ALDEx2, edgeR, ANCOM-BC2, Wilcoxon), estendida aos 5 níveis
+              taxonômicos, e o Machine Learning (Random Forest + SHAP)
+              foram concluídos com sucesso. A comparação final com os
+              valores publicados (etapa 10) também foi feita. Falta
+              concluir apenas o teste de generalização opcional (etapa 11).
             </p>
           </section>
 
@@ -2276,7 +2537,7 @@ export default function App() {
               está só "decorando" as particularidades de cada projeto.
             </p>
             <table className="formal">
-              <caption><span className="cap-label">Tabela 11.</span> O que muda entre este estudo e a dissertação.</caption>
+              <caption><span className="cap-label">Tabela 13.</span> O que muda entre este estudo e a dissertação.</caption>
               <thead><tr><th>Neste estudo</th><th>Na dissertação</th></tr></thead>
               <tbody>
                 <tr><td>Um único estudo grande</td><td>Vários projetos de soja combinados</td></tr>
@@ -2325,7 +2586,7 @@ export default function App() {
         </main>
       </div>
 
-      <footer className="pagefoot">— caderno vivo · PPGTCA / UTFPR —</footer>
+      <footer className="pagefoot">—PPGTCA / UTFPR —</footer>
     </div>
   );
 }
