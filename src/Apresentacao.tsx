@@ -1088,19 +1088,50 @@ const slides: Slide[] = [
             ["Compartimentos", "Raiz (160) · Solo (150) · Rizosfera (139)"],
             ["Seleção", "Controle + seca pré-florescimento, semanas 2–7 e 10–17"],
           ]}
-          note="Critério próprio, explícito e reproduzível (o critério exato do artigo não está documentado). Download e processamento em andamento."
+          note="Critério próprio, explícito e reproduzível (o critério exato do artigo não está documentado)."
         />
       </>
     ),
   },
-  // 33. Relevância pra dissertação (Tabela 11)
+  // 32b. Resultado da generalização (Tabela 11)
+  {
+    content: (
+      <>
+        <Kicker>10 · Generalização</Kicker>
+        <h2 className="highlight-title">O modelo não generalizou bem, e isso importa</h2>
+        <DataTable
+          label="Tabela 11."
+          title="Desempenho dentro do estudo original vs. generalizando para o sorgo (nível de gênero)."
+          head={["Métrica", "Grass-Drought", "Sorghum-Drought"]}
+          rows={[
+            ["Acurácia", "0,937", "0,595"],
+            ["F1-score", "0,937", "0,560"],
+            ["Recall", "0,963", "0,537"],
+            ["AUC", "0,979", "0,621"],
+          ]}
+          note="Dos 613 gêneros aprendidos no Grass-Drought, 514 também apareceram no sorgo; os demais foram tratados como ausentes (zero). Modelo aplicado sem nenhum retreinamento."
+          emphasizeLast
+        />
+        <Concept term="por que isso é um resultado bom, não ruim">
+          Um AUC de 0,621 é só fracamente melhor que chute aleatório (0,5),
+          bem distante do 0,979 obtido dentro do próprio Grass-Drought. Um
+          modelo treinado numa mistura de espécies de gramíneas não
+          transferiu bem para uma espécie diferente, mesmo com a mesma
+          metodologia. Isso é evidência empírica de que combinar projetos
+          sem controlar pela origem arrisca essa mesma queda de
+          desempenho, justificando a validação leave-one-project-out.
+        </Concept>
+      </>
+    ),
+  },
+  // 33. Relevância pra dissertação (Tabela 12)
   {
     content: (
       <>
         <Kicker>11 · Relevância</Kicker>
         <h2>O que isso muda para a dissertação</h2>
         <DataTable
-          label="Tabela 11."
+          label="Tabela 12."
           title="O que muda entre este estudo e a dissertação."
           head={["Neste estudo", "Na dissertação (soja)"]}
           rows={[
@@ -1127,6 +1158,7 @@ const slides: Slide[] = [
           items={[
             <>Pipeline replicado <strong>do dado bruto ao modelo final</strong>, com resultados batendo de perto com o artigo original em todas as frentes</>,
             <>Diversidade, DAA, t-SNE e ML convergem para a mesma conclusão biológica, inclusive o táxon marcador (<em>Kribbella</em>)</>,
+            <>Teste de generalização mostrou queda real de desempenho entre espécies (AUC 0,979 → 0,621), validando empiricamente por que o leave-one-project-out é necessário</>,
             "Investigação de dados reais (BioProjects confusos, tipos de sequenciamento misturados) já foi enfrentada e resolvida",
             <>Pipeline <strong>validado e pronto</strong> para ser adaptado aos dados reais de soja</>,
           ]}
@@ -1143,7 +1175,6 @@ const slides: Slide[] = [
         <h2 className="section-title">Próximos passos</h2>
         <Bullets
           items={[
-            "Concluir o teste de generalização (Sorghum-Drought)",
             "Levantar e consolidar múltiplos datasets reais de soja",
             "Aplicar o pipeline validado com a validação leave-one-project-out",
           ]}

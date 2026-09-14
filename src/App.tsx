@@ -1259,7 +1259,10 @@ print("\\nTabela completa salva em: concordancia_daa_shap.csv")`,
         grupos de tratamento (Controle, seca antes do florescimento, seca
         depois do florescimento), dos quais foram selecionadas 449
         amostras (Controle + seca pré-florescimento, semanas 2–7 e
-        10–17) para esse teste.
+        10–17) para esse teste. <strong>Resultado (seção 5.9): o modelo
+        não generalizou bem</strong> (AUC caiu de 0,979 para 0,621), um
+        achado que reforça, empiricamente, a necessidade da validação
+        leave-one-project-out para a dissertação.
       </>
     ),
     commands: [
@@ -1278,7 +1281,7 @@ qiime tools import \\
   --p-email <email> \\
   --p-threads 4 \\
   --output-dir sequencias_sorghum`,
-        caption: "Baixa as 449 sequências brutas do NCBI SRA, o mesmo processo usado para o Grass-Drought.",
+        caption: "Baixa as 449 sequências brutas do NCBI SRA, o mesmo processo usado para o Grass-Drought. 0 falhas.",
       },
       {
         code: `qiime cutadapt trim-paired \\
@@ -1289,6 +1292,47 @@ qiime tools import \\
   --p-cores 4 \\
   --output-dir cutadapt_output_sorghum`,
         caption: "Remove os mesmos primers 341F/785R; a região do 16S sequenciada é a mesma, só muda a espécie de planta.",
+      },
+      {
+        code: `qiime dada2 denoise-paired \\
+  --i-demultiplexed-seqs cutadapt_output_sorghum/trimmed_sequences.qza \\
+  --p-trunc-len-f 265 \\
+  --p-trunc-len-r 195 \\
+  --p-n-threads 4 \\
+  --output-dir dada2_output_sorghum \\
+  --verbose
+
+qiime feature-classifier classify-sklearn \\
+  --i-classifier silva-v3v4-classifier.qza \\
+  --i-reads dada2_output_sorghum/representative_sequences.qza \\
+  --p-n-jobs 4 \\
+  --output-dir taxonomy_output_sorghum \\
+  --verbose`,
+        caption: "DADA2 (truncLen decidido a partir do gráfico de qualidade, igual ao Grass-Drought) e taxonomia, reaproveitando o mesmo classificador SILVA V3-V4 já treinado.",
+      },
+      {
+        code: `qiime taxa collapse \\
+  --i-table dada2_output_sorghum/table.qza \\
+  --i-taxonomy taxonomy_output_sorghum/classification.qza \\
+  --p-level 7 \\
+  --o-collapsed-table collapsed-level-7-sorghum.qza
+
+qiime feature-table relative-frequency \\
+  --i-table collapsed-level-7-sorghum.qza \\
+  --o-relative-frequency-table relative-level-7-sorghum.qza
+
+qiime tools export \\
+  --input-path relative-level-7-sorghum.qza \\
+  --output-path exported-relative-level-7-sorghum`,
+        caption: "Colapsa a tabela do sorgo no nível de gênero e exporta, no mesmo formato usado para treinar o modelo no Grass-Drought.",
+      },
+      {
+        code: `# script completo em generalizacao_sorghum.py
+# 1) treina o Random Forest final em TODO o Grass-Drought (nível gênero)
+# 2) alinha as colunas do sorgo às features que o modelo conhece
+# 3) aplica sem retreinar e avalia contra os rótulos reais do sorgo
+python3 generalizacao_sorghum.py`,
+        caption: "Treina o modelo final (não só os folds de validação) e testa a generalização real, sem nenhum ajuste nos dados do sorgo além do alinhamento de colunas.",
       },
     ],
   },
@@ -2240,9 +2284,8 @@ export default function App() {
             <h2 className="sec"><span className="sec-num">5.</span>Resultados obtidos até agora</h2>
             <p>
               Um resumo consolidado de todos os números produzidos pela
-              replicação até o momento, organizado por etapa. O núcleo da
-              replicação está completo; falta apenas o teste de
-              generalização opcional (etapa 11), em andamento.
+              replicação, do dado bruto ao modelo final. A replicação está
+              completa em todas as etapas planejadas.
             </p>
 
             <h3 className="sub-title">5.1 Processamento DADA2 e taxonomia</h3>
@@ -2723,21 +2766,56 @@ export default function App() {
                 claramente documentado nas fontes disponíveis. Em vez de
                 adivinhar até bater um número, esta replicação usa um
                 critério próprio, definido de forma explícita e
-                reproduzível (acima), uma aproximação razoável, não uma
-                réplica byte-a-byte do subconjunto original. O download e
-                processamento dessas 449 amostras está em andamento; os
-                resultados da etapa 11 (aplicar o modelo já treinado, sem
-                retreinar) serão adicionados aqui quando terminarem.
+                reproduzível (acima): uma aproximação razoável, não uma
+                réplica byte-a-byte do subconjunto original.
+              </p>
+            </div>
+
+            <h3 className="sub-title">5.9 Resultado da generalização</h3>
+            <p>
+              Com os dados do sorgo processados no mesmo formato (nível de
+              gênero), o Random Forest treinado no Grass-Drought, sem
+              nenhum retreinamento, foi aplicado direto às 449 amostras
+              do Sorghum-Drought. Dos 613 gêneros que o modelo aprendeu a
+              reconhecer, 514 também apareceram no sorgo; os demais foram
+              tratados como ausentes (zero).
+            </p>
+            <table className="formal">
+              <caption><span className="cap-label">Tabela 13.</span> Desempenho do modelo dentro do estudo original vs. generalizando para uma espécie nova.</caption>
+              <thead><tr><th>Métrica</th><th>Grass-Drought (nível de gênero)</th><th>Sorghum-Drought (generalização)</th></tr></thead>
+              <tbody>
+                <tr><td>Acurácia</td><td>0,937</td><td>0,595</td></tr>
+                <tr><td>F1-score</td><td>0,937</td><td>0,560</td></tr>
+                <tr><td>Recall</td><td>0,963</td><td>0,537</td></tr>
+                <tr><td>AUC</td><td>0,979</td><td>0,621</td></tr>
+              </tbody>
+            </table>
+            <div className="callout">
+              <div className="callout-label">o modelo não generalizou bem, e isso é um achado importante</div>
+              <p>
+                Um AUC de 0,621 é apenas fracamente melhor que um{" "}
+                <Term id="aucMetric">chute aleatório</Term> (0,5), bem
+                distante do 0,979 obtido dentro do próprio Grass-Drought.
+                Isso não é uma falha da replicação: é evidência direta de
+                que um modelo treinado numa mistura de espécies de
+                gramíneas <strong>não transfere automaticamente</strong>{" "}
+                para uma espécie diferente (sorgo), mesmo usando a mesma
+                metodologia, os mesmos primers e o mesmo nível taxonômico.
+                Esse resultado empírico reforça exatamente o argumento
+                central da dissertação: combinar dados de múltiplos
+                projetos de soja sem controlar pelo projeto de origem
+                arrisca o mesmo tipo de queda de desempenho, daí a
+                necessidade da validação <Term id="looPo">leave-one-project-out</Term>.
               </p>
             </div>
 
             <p>
               A Análise de Abundância Diferencial com os 5 métodos (DESeq2,
               ALDEx2, edgeR, ANCOM-BC2, Wilcoxon), estendida aos 5 níveis
-              taxonômicos, e o Machine Learning (Random Forest + SHAP)
-              foram concluídos com sucesso. A comparação final com os
-              valores publicados (etapa 10) também foi feita. Falta
-              concluir apenas o teste de generalização opcional (etapa 11).
+              taxonômicos, o Machine Learning (Random Forest + SHAP), a
+              comparação final com os valores publicados e o teste de
+              generalização com o Sorghum-Drought foram todos concluídos.
+              A replicação está completa.
             </p>
           </section>
 
@@ -2755,7 +2833,7 @@ export default function App() {
               está só "decorando" as particularidades de cada projeto.
             </p>
             <table className="formal">
-              <caption><span className="cap-label">Tabela 13.</span> O que muda entre este estudo e a dissertação.</caption>
+              <caption><span className="cap-label">Tabela 14.</span> O que muda entre este estudo e a dissertação.</caption>
               <thead><tr><th>Neste estudo</th><th>Na dissertação</th></tr></thead>
               <tbody>
                 <tr><td>Um único estudo grande</td><td>Vários projetos de soja combinados</td></tr>
